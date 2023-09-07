@@ -428,8 +428,14 @@ func (c *fakeSQSClient) GetQueueAttributes(ctx context.Context, params *sqs.GetQ
 	c.prepare()
 	return &sqs.GetQueueAttributesOutput{
 		Attributes: map[string]string{
-			"ApproximateNumberOfMessages": strconv.Itoa(len(c.messages)),
-			"VisibilityTimeout":           fmt.Sprintf("%d", int(c.visibilityTimeout.Seconds())),
+			"VisibilityTimeout": fmt.Sprintf("%d", int(c.visibilityTimeout.Seconds())),
 		},
 	}, nil
+}
+
+func (c *fakeSQSClient) MessageCount() int {
+	c.prepare()
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	return len(c.messages)
 }

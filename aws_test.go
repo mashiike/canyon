@@ -57,7 +57,7 @@ func TestFakeSQSClient(t *testing.T) {
 		})
 		require.NoError(t, err, "should send message")
 		require.NotEmpty(t, sendMessageResult.MessageId, "should have message id")
-		require.Equal(t, 1, len(fakeSQSClient.messages), "should have 1 message in fake sqs client")
+		require.Equal(t, 1, fakeSQSClient.MessageCount(), "should have 1 message in fake sqs client")
 	}()
 	var receiptHandle string
 	go func() {
