@@ -10,7 +10,7 @@ require (
 	github.com/fujiwara/ridge v0.6.1
 	github.com/google/uuid v1.3.1
 	github.com/pires/go-proxyproto v0.6.0
-	github.com/stretchr/testify v1.7.2
+	github.com/stretchr/testify v1.8.4
 )
 
 require (
