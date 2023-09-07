@@ -8,7 +8,6 @@ import (
 	"testing"
 
 	"github.com/aws/aws-lambda-go/events"
-	"github.com/fujiwara/ridge"
 	"github.com/stretchr/testify/require"
 )
 
@@ -43,16 +42,6 @@ func TestKebabCaseToCamelCase(t *testing.T) {
 	require.Equal(t, "fooBarBaz", kebabCaseToCamelCase("foo-bar-baz"))
 	require.Equal(t, "foo_bar_baz", kebabCaseToCamelCase("foo_bar_baz"))
 	require.Equal(t, "foo bar baz", kebabCaseToCamelCase("foo bar baz"))
-}
-
-func TestNewJSONSerializableRequest(t *testing.T) {
-	req, err := ridge.NewRequest(ReadFile(t, "testdata/http_event.json"))
-	require.NoError(t, err, "should create request")
-	serialized, err := NewJSONSerializableRequest(req)
-	require.NoError(t, err, "should serialize request")
-	bs, err := json.Marshal(serialized)
-	require.NoError(t, err, "should marshal")
-	require.JSONEq(t, string(ReadFile(t, "testdata/serialized_http_request.json")), string(bs), "same as expected serialized request")
 }
 
 func TestNewRequestWithSQSMessages(t *testing.T) {
