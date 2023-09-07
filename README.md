@@ -92,7 +92,7 @@ canyon convert SQS Event to HTTP Request, and set `Sqs-Message-Id`, `Sqs-Message
 
 ### canyon.SendToWorker(r, attributes)
 
-`canyon.SendToWorker(r, attributes)` sends request to SQS queue.
+`canyon.SendToWorker(r, attributes)` sends request to worker with SQS queue.
 can call only `canyon.IsWorker(r) == false` request.
 this function is capsuled `sqsClient.SendMessage(ctx, &sqs.SendMessageInput{...})` and returns `SendMessageOutput.MessageId` and `error`.
 
