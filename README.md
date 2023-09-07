@@ -42,7 +42,7 @@ func handler(w http.ResponseWriter, r *http.Request) {
 	if !canyon.IsWorker(r) {
 		logger.Info("server process", slog.String("request", r.URL.Path))
 		// handle webhook directly
-		messageId, err := canyon.SendToSQS(r, nil)
+		messageId, err := canyon.SendToWorker(r, nil)
 		if err != nil {
 			logger.Error("failed to send sqs message", "error", err)
 			w.WriteHeader(http.StatusInternalServerError)
@@ -85,16 +85,22 @@ example lambda function in [lambda/](lambda/) directory.
 `canyon.IsWorker(r)` returns true if the request is from SQS worker.
 
 if this functions returns false, handler behaves as webhook handling server.
-if not worker request, `canyon.SendToSQS(r, nil)` sends request to SQS queue.
+if not worker request, `canyon.SendToWorker(r, nil)` sends request to SQS queue.
 
 if this functions returns true, handler behaves as worker.
 canyon convert SQS Event to HTTP Request, and set `Sqs-Message-Id`, `Sqs-Message-Attributes-...` header to request.
 
-### canyon.SendToSQS(r, attributes)
+### canyon.SendToWorker(r, attributes)
 
-`canyon.SendToSQS(r, attributes)` sends request to SQS queue.
+`canyon.SendToWorker(r, attributes)` sends request to worker with SQS queue.
 can call only `canyon.IsWorker(r) == false` request.
 this function is capsuled `sqsClient.SendMessage(ctx, &sqs.SendMessageInput{...})` and returns `SendMessageOutput.MessageId` and `error`.
+
+if attributes is nil, sqs message no message attributes.
+can set `map[string]sqs.MessageAttributeValue` to attributes.
+helper function `canyon.ToMessageAttributes(...)` converts http.Header to sqs.MessageAttributeValue.
+
+## Advanced Usage
 
 ### If customizing worker response behavior, use `canyon.WithWorkerResponseChecker`
 
