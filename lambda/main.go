@@ -32,7 +32,7 @@ func handler(w http.ResponseWriter, r *http.Request) {
 	if !canyon.IsWorker(r) {
 		logger.Info("server process", slog.String("request", r.URL.Path))
 		// handle webhook directly
-		messageId, err := canyon.SendToSQS(r, nil)
+		messageId, err := canyon.SendToWorker(r, nil)
 		if err != nil {
 			logger.Error("failed to send sqs message", "error", err)
 			w.WriteHeader(http.StatusInternalServerError)
