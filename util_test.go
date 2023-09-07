@@ -29,6 +29,22 @@ func ReadJSON[T any](t *testing.T, path string) *T {
 	return &v
 }
 
+func TestCamelCaseToKebabCase(t *testing.T) {
+	require.Equal(t, "Foo-Bar-Baz", camelCaseToKebabCase("FooBarBaz"))
+	require.Equal(t, "foo-Bar-Baz", camelCaseToKebabCase("fooBarBaz"))
+	require.Equal(t, "foo-bar-baz", camelCaseToKebabCase("foo-bar-baz"))
+	require.Equal(t, "foo_bar_baz", camelCaseToKebabCase("foo_bar_baz"))
+	require.Equal(t, "foo bar baz", camelCaseToKebabCase("foo bar baz"))
+}
+
+func TestKebabCaseToCamelCase(t *testing.T) {
+	require.Equal(t, "FooBarBaz", kebabCaseToCamelCase("Foo-Bar-Baz"))
+	require.Equal(t, "fooBarBaz", kebabCaseToCamelCase("foo-Bar-Baz"))
+	require.Equal(t, "fooBarBaz", kebabCaseToCamelCase("foo-bar-baz"))
+	require.Equal(t, "foo_bar_baz", kebabCaseToCamelCase("foo_bar_baz"))
+	require.Equal(t, "foo bar baz", kebabCaseToCamelCase("foo bar baz"))
+}
+
 func TestNewJSONSerializableRequest(t *testing.T) {
 	req, err := ridge.NewRequest(ReadFile(t, "testdata/http_event.json"))
 	require.NoError(t, err, "should create request")

@@ -43,7 +43,11 @@ func Example() {
 			if !canyon.IsWorker(r) {
 				logger.Info("handle webhook directly", "method", r.Method, "path", r.URL.Path)
 				// handle webhook directly
-				messageId, err := canyon.SendToSQS(r, nil)
+				messageId, err := canyon.SendToSQS(r, canyon.ToMessageAttributes(
+					http.Header{
+						"User-Name": []string{"test user"},
+					},
+				))
 				if err != nil {
 					logger.Error("failed to send sqs message", "error", err)
 					w.WriteHeader(http.StatusInternalServerError)
@@ -62,7 +66,7 @@ func Example() {
 				return
 			}
 			defer r.Body.Close()
-			messageCh <- string(bs)
+			messageCh <- string(bs) + ":" + r.Header.Get(canyon.HeaderSQSMessageAttribute("UserName", "String"))
 			close(messageCh)
 			w.WriteHeader(http.StatusOK) // if return 2xx, sqs message will be deleted from queue
 		})
@@ -100,5 +104,5 @@ func Example() {
 	cancel()
 	wg.Wait()
 	//Output:
-	// hello world
+	// hello world:test user
 }

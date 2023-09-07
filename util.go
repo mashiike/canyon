@@ -31,6 +31,21 @@ func camelCaseToKebabCase(s string) string {
 	return buf.String()
 }
 
+func kebabCaseToCamelCase(s string) string {
+	var buf bytes.Buffer
+	for i, r := range s {
+		if i > 0 && r == '-' {
+			continue
+		}
+		if i > 0 && 'a' <= r && r <= 'z' && s[i-1] == '-' {
+			buf.WriteRune(r - 32)
+			continue
+		}
+		buf.WriteRune(r)
+	}
+	return buf.String()
+}
+
 func coalesce(strs ...*string) string {
 	for _, str := range strs {
 		if str != nil {
@@ -200,4 +215,31 @@ func randomBytes(n int) []byte {
 
 func md5Digest(s string) string {
 	return fmt.Sprintf("%x", md5.Sum([]byte(s)))
+}
+
+// ToMessageAttributes converts http.Header to SQS MessageAttributes.
+func ToMessageAttributes(h http.Header) map[string]types.MessageAttributeValue {
+	m := make(map[string]types.MessageAttributeValue, len(h))
+	for k, v := range h {
+		if len(v) == 0 {
+			continue
+		}
+		k := kebabCaseToCamelCase(k)
+		if len(v) == 1 {
+			m[k] = types.MessageAttributeValue{
+				DataType:    aws.String("String"),
+				StringValue: aws.String(v[0]),
+			}
+			continue
+		}
+		sl := make([]string, len(v))
+		for i, s := range v {
+			sl[i] = s
+		}
+		m[k] = types.MessageAttributeValue{
+			DataType:         aws.String("String"),
+			StringListValues: sl,
+		}
+	}
+	return m
 }
