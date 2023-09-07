@@ -12,6 +12,7 @@ import (
 	"github.com/aws/aws-lambda-go/events"
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/config"
+	"github.com/aws/aws-sdk-go-v2/service/s3"
 	"github.com/aws/aws-sdk-go-v2/service/sqs"
 	"github.com/aws/aws-sdk-go-v2/service/sqs/types"
 	"github.com/stretchr/testify/require"
@@ -189,4 +190,64 @@ func TestSQSLongPollingService__WithAWS(t *testing.T) {
 	})
 	require.NoError(t, err, "should get queue attributes")
 	require.Equal(t, "0", getAttributes.Attributes["ApproximateNumberOfMessages"], "should have no message in queue")
+}
+
+type mockS3Client struct {
+	t                           *testing.T
+	PutObjectFunc               func(context.Context, *s3.PutObjectInput, ...func(*s3.Options)) (*s3.PutObjectOutput, error)
+	UploadPartFunc              func(context.Context, *s3.UploadPartInput, ...func(*s3.Options)) (*s3.UploadPartOutput, error)
+	CreateMultipartUploadFunc   func(context.Context, *s3.CreateMultipartUploadInput, ...func(*s3.Options)) (*s3.CreateMultipartUploadOutput, error)
+	CompleteMultipartUploadFunc func(context.Context, *s3.CompleteMultipartUploadInput, ...func(*s3.Options)) (*s3.CompleteMultipartUploadOutput, error)
+	AbortMultipartUploadFunc    func(context.Context, *s3.AbortMultipartUploadInput, ...func(*s3.Options)) (*s3.AbortMultipartUploadOutput, error)
+	HeadObjectFunc              func(context.Context, *s3.HeadObjectInput, ...func(*s3.Options)) (*s3.HeadObjectOutput, error)
+	GetObjectFunc               func(context.Context, *s3.GetObjectInput, ...func(*s3.Options)) (*s3.GetObjectOutput, error)
+}
+
+func (c *mockS3Client) PutObject(ctx context.Context, params *s3.PutObjectInput, optFns ...func(*s3.Options)) (*s3.PutObjectOutput, error) {
+	if c.PutObjectFunc == nil {
+		c.t.Fatal("PutObjectFunc is not set, unexpected call")
+	}
+	return c.PutObjectFunc(ctx, params, optFns...)
+}
+
+func (c *mockS3Client) UploadPart(ctx context.Context, params *s3.UploadPartInput, optFns ...func(*s3.Options)) (*s3.UploadPartOutput, error) {
+	if c.UploadPartFunc == nil {
+		c.t.Fatal("UploadPartFunc is not set, unexpected call")
+	}
+	return c.UploadPartFunc(ctx, params, optFns...)
+}
+
+func (c *mockS3Client) CreateMultipartUpload(ctx context.Context, params *s3.CreateMultipartUploadInput, optFns ...func(*s3.Options)) (*s3.CreateMultipartUploadOutput, error) {
+	if c.CreateMultipartUploadFunc == nil {
+		c.t.Fatal("CreateMultipartUploadFunc is not set, unexpected call")
+	}
+	return c.CreateMultipartUploadFunc(ctx, params, optFns...)
+}
+
+func (c *mockS3Client) CompleteMultipartUpload(ctx context.Context, params *s3.CompleteMultipartUploadInput, optFns ...func(*s3.Options)) (*s3.CompleteMultipartUploadOutput, error) {
+	if c.CompleteMultipartUploadFunc == nil {
+		c.t.Fatal("CompleteMultipartUploadFunc is not set, unexpected call")
+	}
+	return c.CompleteMultipartUploadFunc(ctx, params, optFns...)
+}
+
+func (c *mockS3Client) AbortMultipartUpload(ctx context.Context, params *s3.AbortMultipartUploadInput, optFns ...func(*s3.Options)) (*s3.AbortMultipartUploadOutput, error) {
+	if c.AbortMultipartUploadFunc == nil {
+		c.t.Fatal("AbortMultipartUploadFunc is not set, unexpected call")
+	}
+	return c.AbortMultipartUploadFunc(ctx, params, optFns...)
+}
+
+func (c *mockS3Client) HeadObject(ctx context.Context, params *s3.HeadObjectInput, optFns ...func(*s3.Options)) (*s3.HeadObjectOutput, error) {
+	if c.HeadObjectFunc == nil {
+		c.t.Fatal("HeadObjectFunc is not set, unexpected call")
+	}
+	return c.HeadObjectFunc(ctx, params, optFns...)
+}
+
+func (c *mockS3Client) GetObject(ctx context.Context, params *s3.GetObjectInput, optFns ...func(*s3.Options)) (*s3.GetObjectOutput, error) {
+	if c.GetObjectFunc == nil {
+		c.t.Fatal("GetObjectFunc is not set, unexpected call")
+	}
+	return c.GetObjectFunc(ctx, params, optFns...)
 }

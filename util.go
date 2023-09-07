@@ -9,6 +9,7 @@ import (
 	"io"
 	"math/rand"
 	"net/http"
+	"net/url"
 	"strings"
 	"time"
 
@@ -190,4 +191,14 @@ func ToMessageAttributes(h http.Header) map[string]types.MessageAttributeValue {
 		}
 	}
 	return m
+}
+
+func isS3URL(u *url.URL) bool {
+	if u.Scheme != "s3" {
+		return false
+	}
+	if u.Host == "" {
+		return false
+	}
+	return true
 }
