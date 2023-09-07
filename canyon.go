@@ -59,7 +59,7 @@ func runWithContext(ctx context.Context, mux http.Handler, c *runOptions) error 
 					return nil, err
 				}
 				if p.IsSQSEvent && !c.disableWorker {
-					workerHandler(ctx, p.SQSEvent)
+					return workerHandler(ctx, p.SQSEvent)
 				}
 				if p.IsHTTPEvent && !c.disableServer {
 					r := p.Request.WithContext(ctx)
