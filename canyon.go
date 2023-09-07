@@ -306,7 +306,7 @@ func newServerHandler(mux http.Handler, c *runOptions) http.Handler {
 	})
 }
 
-func SendToSQS(r *http.Request, messageAttrs map[string]types.MessageAttributeValue) (string, error) {
+func SendToWorker(r *http.Request, messageAttrs map[string]types.MessageAttributeValue) (string, error) {
 	sqsMessageSender := sqsMessageSenderFromContext(r.Context())
 	if sqsMessageSender == nil {
 		return "", errors.New("sqs message sender is not set: may be worker or not running with canyon")

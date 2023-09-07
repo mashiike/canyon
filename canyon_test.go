@@ -35,7 +35,7 @@ func TestWorkerHandler__Success(t *testing.T) {
 			require.NoError(t, err, "should parse form")
 			require.Equal(t, "bar baz", r.Form.Get("foo"))
 			w.WriteHeader(http.StatusOK)
-			_, err = SendToSQS(r, nil)
+			_, err = SendToWorker(r, nil)
 			require.Error(t, err, "should can not send to sqs from worker")
 		}), c,
 	)
@@ -95,7 +95,7 @@ func TestServerHandler(t *testing.T) {
 		err := r.ParseForm()
 		require.NoError(t, err, "should parse form")
 		require.Equal(t, "bar baz", r.Form.Get("foo"))
-		messageId, err = SendToSQS(r, map[string]types.MessageAttributeValue{
+		messageId, err = SendToWorker(r, map[string]types.MessageAttributeValue{
 			"foo": {
 				DataType:    aws.String("String"),
 				StringValue: aws.String("bar"),

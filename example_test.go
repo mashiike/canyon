@@ -43,7 +43,7 @@ func Example() {
 			if !canyon.IsWorker(r) {
 				logger.Info("handle webhook directly", "method", r.Method, "path", r.URL.Path)
 				// handle webhook directly
-				messageId, err := canyon.SendToSQS(r, canyon.ToMessageAttributes(
+				messageId, err := canyon.SendToWorker(r, canyon.ToMessageAttributes(
 					http.Header{
 						"User-Name": []string{"test user"},
 					},
