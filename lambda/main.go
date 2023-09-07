@@ -20,6 +20,9 @@ func main() {
 	opts := []canyon.Option{
 		canyon.WithServerAddress(":8080", "/"),
 	}
+	if os.Getenv("CANYON_S3_BACKEND") != "" {
+		opts = append(opts, canyon.WithS3Backend(os.Getenv("CANYON_S3_BACKEND")))
+	}
 	err := canyon.RunWithContext(ctx, "canyon-example", http.HandlerFunc(handler), opts...)
 	if err != nil {
 		slog.Error("failed to run canyon", "error", err)
