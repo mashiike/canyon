@@ -1,0 +1,40 @@
+{
+  "Records": [
+    {
+      "messageId": "00000000-0000-0000-0000-000000000000",
+      "receiptHandle": "MessageReceiptHandle",
+      "md5OfMessageAttributes" : "582c92c5c5b6ac403040a4f3ab3115c9",
+      "body": "{\"method\":\"POST\",\"header\":{\"Accept\":[\"*/*\"],\"Content-Length\":[\"13\"],\"Content-Type\":[\"application/x-www-form-urlencoded\"],\"User-Agent\":[\"curl/7.68.0\"],\"X-Amzn-Trace-Id\":[\"Root=1-5e723db7-6077c85e0d781094f0c83e24\"],\"X-Forwarded-For\":[\"203.0.113.1\"],\"X-Forwarded-Port\":[\"443\"],\"X-Forwarded-Proto\":[\"https\"]},\"body\":\"Zm9vPWJhciUyMGJheg==\",\"content_length\":13,\"remote_addr\":\"203.0.113.1\",\"host\":\"abcdefg.execute-api.ap-northeast-1.amazonaws.com\",\"request_uri\":\"/\",\"url\":\"/\"}",
+      "attributes": {
+        "ApproximateReceiveCount": "3",
+        "SentTimestamp": "1693993542490",
+        "SenderId": "AROAIWPX5BD2BHG722MW4:sender",
+        "ApproximateFirstReceiveTimestamp": "1693993542501"
+      },
+      "messageAttributes": {
+        "Attribute3" : {
+          "binaryValue" : "MTEwMA==",
+          "stringListValues" : ["abc", "123"],
+          "binaryListValues" : ["MA==", "MQ==", "MA=="],
+          "dataType" : "Binary"
+        },
+        "Attribute2" : {
+          "stringValue" : "123",
+          "stringListValues" : [ ],
+          "binaryListValues" : ["MQ==", "MA=="],
+          "dataType" : "Number"
+        },
+        "Attribute1" : {
+          "stringValue" : "AttributeValue1",
+          "stringListValues" : [ ],
+          "binaryListValues" : [ ],
+          "dataType" : "String"
+        }
+      },
+      "md5OfBody": "f5fe70cf5deffcae2d8405f991b65402",
+      "eventSource": "aws:sqs",
+      "eventSourceARN": "arn:aws:sqs:ap-northeast-1:123456789012:sqs-queue",
+      "awsRegion": "ap-northeast-1"
+    }
+  ]
+}
