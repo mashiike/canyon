@@ -96,6 +96,12 @@ canyon convert SQS Event to HTTP Request, and set `Sqs-Message-Id`, `Sqs-Message
 can call only `canyon.IsWorker(r) == false` request.
 this function is capsuled `sqsClient.SendMessage(ctx, &sqs.SendMessageInput{...})` and returns `SendMessageOutput.MessageId` and `error`.
 
+if attributes is nil, sqs message no message attributes.
+can set `map[string]sqs.MessageAttributeValue` to attributes.
+helper function `canyon.ToMessageAttributes(...)` converts http.Header to sqs.MessageAttributeValue.
+
+## Advanced Usage
+
 ### If customizing worker response behavior, use `canyon.WithWorkerResponseChecker`
 
 ```go
