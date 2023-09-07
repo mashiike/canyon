@@ -35,6 +35,8 @@ func TestWorkerHandler__Success(t *testing.T) {
 			require.NoError(t, err, "should parse form")
 			require.Equal(t, "bar baz", r.Form.Get("foo"))
 			w.WriteHeader(http.StatusOK)
+			_, err = SendToSQS(r, nil)
+			require.Error(t, err, "should can not send to sqs from worker")
 		}), c,
 	)
 	sqsEvent := ReadJSON[events.SQSEvent](t, "testdata/sqs_event.json")
