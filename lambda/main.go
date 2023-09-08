@@ -30,6 +30,7 @@ func main() {
 		b.SetUploaderName("canyon-example")
 		opts = append(opts, canyon.WithBackend(b))
 	}
+	opts = append(opts, canyon.WithCanyonEnv(os.Getenv("CANYON_ENV")))
 	err := canyon.RunWithContext(ctx, "canyon-example", http.HandlerFunc(handler), opts...)
 	if err != nil {
 		slog.Error("failed to run canyon", "error", err)
