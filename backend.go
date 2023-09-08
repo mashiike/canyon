@@ -88,7 +88,7 @@ func (b *InMemoryBackend) SaveRequestBody(ctx context.Context, req *http.Request
 	if err != nil {
 		return nil, fmt.Errorf("failed to read request body: %w", err)
 	}
-	backendURL, err := url.Parse(fmt.Sprintf("in-memory://canyon/%s", uuid.New().String()))
+	backendURL, err := parseURL(fmt.Sprintf("in-memory://canyon/%s", uuid.New().String()))
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse backend url: %w", err)
 	}
@@ -114,6 +114,7 @@ type FileBackend struct {
 
 // NewFileBackend returns new FileBackend.
 func NewFileBackend(path string) (*FileBackend, error) {
+
 	st, err := os.Stat(path)
 	if err != nil {
 		if os.IsNotExist(err) {
