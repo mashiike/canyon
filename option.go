@@ -101,6 +101,18 @@ func (c *runOptions) DebugContextWhenVarbose(ctx context.Context, msg string, ke
 	}
 }
 
+func (c *runOptions) InfoContextWhenVarbose(ctx context.Context, msg string, keysAndValues ...interface{}) {
+	if c.logVarbose {
+		c.logger.InfoContext(ctx, msg, keysAndValues...)
+	}
+}
+
+func (c *runOptions) WarnContextWhenVarbose(ctx context.Context, msg string, keysAndValues ...interface{}) {
+	if c.logVarbose {
+		c.logger.WarnContext(ctx, msg, keysAndValues...)
+	}
+}
+
 // Option is a Run() and RunWtihContext() option.
 type Option func(*runOptions)
 
