@@ -332,6 +332,7 @@ func WithCanyonEnv(envPrefix string) Option {
 			WithInMemoryQueue(30*time.Second, 3, nil)(c)
 			WithBackend(NewInMemoryBackend())(c)
 		default:
+			env = "production"
 			if urlStr := os.Getenv(envPrefix + "BACKEND_URL"); urlStr != "" {
 				u, err := parseURL(urlStr)
 				if err != nil {
