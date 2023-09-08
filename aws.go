@@ -1,6 +1,7 @@
 package canyon
 
 import (
+	"bytes"
 	"context"
 	"encoding/base64"
 	"encoding/json"
@@ -8,6 +9,7 @@ import (
 	"fmt"
 	"io"
 	"log/slog"
+	"net/http"
 	"net/url"
 	"sort"
 	"strconv"
@@ -18,6 +20,7 @@ import (
 	"github.com/aws/aws-lambda-go/events"
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/aws/arn"
+	"github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/feature/s3/manager"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 	"github.com/aws/aws-sdk-go-v2/service/sqs"
@@ -446,4 +449,112 @@ func (c *fakeSQSClient) MessageCount() int {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	return len(c.messages)
+}
+
+type S3Backend struct {
+	s3URLPrefix *url.URL
+	once        sync.Once
+	initErr     error
+	s3Client    S3Client
+	uploader    *manager.Uploader
+	downloader  *manager.Downloader
+}
+
+func NewS3Backend(s3URLPrefix string) (*S3Backend, error) {
+	s3URL, err := url.Parse(s3URLPrefix)
+	if err != nil {
+		return nil, fmt.Errorf("parse failed url: %w", err)
+	}
+	if !isS3URL(s3URL) {
+		return nil, fmt.Errorf("invalid s3 url: %s", s3URL.String())
+	}
+	return &S3Backend{
+		s3URLPrefix: s3URL,
+	}, err
+}
+
+func (b *S3Backend) init() {
+	b.once.Do(func() {
+		if b.s3Client == nil {
+			awsCfg, err := config.LoadDefaultConfig(context.Background())
+			if err != nil {
+				b.initErr = err
+			}
+			b.SetS3Client(s3.NewFromConfig(awsCfg))
+		}
+	})
+}
+
+func (b *S3Backend) SetS3Client(s3Client S3Client) {
+	b.initErr = nil
+	b.s3Client = s3Client
+	b.uploader = manager.NewUploader(s3Client)
+	b.downloader = manager.NewDownloader(s3Client)
+}
+
+func (b *S3Backend) SaveRequestBody(ctx context.Context, req *http.Request) (*url.URL, error) {
+	b.init()
+	if b.initErr != nil {
+		return nil, fmt.Errorf("failed to initialize s3 backend: %w", b.initErr)
+	}
+	now := time.Now()
+	u := b.s3URLPrefix.JoinPath(
+		now.Format("2006/01/02/15/"),
+		fmt.Sprintf(
+			"%s-%s%s",
+			now.Format("20060102-150405"),
+			uuid.New().String(),
+			getExtension(req.Header.Get("Content-Type")),
+		),
+	)
+	objectKey := strings.TrimLeft(u.Path, "/")
+	params := &s3.PutObjectInput{
+		Bucket:      aws.String(u.Host),
+		Key:         aws.String(objectKey),
+		Body:        req.Body,
+		ContentType: aws.String(req.Header.Get("Content-Type")),
+		Metadata: map[string]string{
+			"Uploader":          "canyon",
+			"RequestURL":        req.URL.String(),
+			"RequestMethod":     req.Method,
+			"RequestRemoteAddr": req.RemoteAddr,
+			"RequestHost":       req.Host,
+			"RequestUserAgent":  req.UserAgent(),
+			"RequestTraceId":    req.Header.Get("X-Amzn-Trace-Id"),
+		},
+	}
+	defer req.Body.Close()
+	_, err := b.uploader.Upload(ctx, params)
+	if err != nil {
+		return nil, fmt.Errorf("failed to upload request: %w", err)
+	}
+	return u, nil
+}
+
+func (b *S3Backend) LoadRequestBody(ctx context.Context, u *url.URL) (io.ReadCloser, error) {
+	b.init()
+	if b.initErr != nil {
+		return nil, fmt.Errorf("failed to initialize s3 backend: %w", b.initErr)
+	}
+	if !isS3URL(u) {
+		return nil, fmt.Errorf("invalid s3 url: %s", u.String())
+	}
+	objectKey := strings.TrimLeft(u.Path, "/")
+	head, err := b.s3Client.HeadObject(ctx, &s3.HeadObjectInput{
+		Bucket: aws.String(u.Host),
+		Key:    aws.String(objectKey),
+	})
+	if err != nil {
+		return nil, fmt.Errorf("failed to head object: %w", err)
+	}
+	buf := manager.NewWriteAtBuffer(make([]byte, head.ContentLength))
+	_, err = b.downloader.Download(context.Background(), buf, &s3.GetObjectInput{
+		Bucket: aws.String(u.Host),
+		Key:    aws.String(objectKey),
+	})
+	if err != nil {
+		return nil, fmt.Errorf("failed to download request: %w", err)
+	}
+	objectBody := buf.Bytes()[:head.ContentLength]
+	return io.NopCloser(bytes.NewReader(objectBody)), nil
 }

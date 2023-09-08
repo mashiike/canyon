@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"io"
 	"math/rand"
+	"mime"
 	"net/http"
 	"net/url"
 	"strings"
@@ -201,4 +202,32 @@ func isS3URL(u *url.URL) bool {
 		return false
 	}
 	return true
+}
+
+var preferredExts = []string{
+	".json",
+	".txt",
+	".html",
+	".jpeg",
+	".png",
+	".gif",
+	".svg",
+}
+
+func getExtension(contentType string) string {
+	exts, err := mime.ExtensionsByType(contentType)
+	if err != nil {
+		return ".bin"
+	}
+	if len(exts) > 0 {
+		for _, preferredExt := range preferredExts {
+			for _, ext := range exts {
+				if strings.ToLower(ext) == preferredExt {
+					return ext
+				}
+			}
+		}
+		return exts[0]
+	}
+	return ".bin"
 }

@@ -2,6 +2,7 @@ package canyon
 
 import (
 	"encoding/json"
+	"fmt"
 	"io"
 	"net/http"
 	"os"
@@ -83,4 +84,26 @@ func TestNewRequestWithSQSMessages(t *testing.T) {
 func TestRundomBytes(t *testing.T) {
 	bs := randomBytes(32)
 	require.Equal(t, 32, len(bs), "should have 32 bytes")
+}
+
+func TestGetExtension(t *testing.T) {
+	cases := [][]string{
+		{"application/json", ".json"},
+		{"application/json; charset=utf-8", ".json"},
+		{"application/json;charset=utf-8", ".json"},
+		{"application/json; charset=utf-8; foo=bar", ".json"},
+		{"image/png", ".png"},
+		{"image/gif", ".gif"},
+		{"image/jpeg", ".jpeg"},
+		{"image/svg+xml", ".svg"},
+		{"image/webp", ".webp"},
+		{"text/html", ".html"},
+		{"text/css", ".css"},
+		{"text/javascript", ".js"},
+		{"text/plain", ".txt"},
+		{"", ".bin"},
+	}
+	for _, c := range cases {
+		require.Equal(t, c[1], getExtension(c[0]), fmt.Sprintf("should get extension `%s`->`%s`", c[0], c[1]))
+	}
 }
