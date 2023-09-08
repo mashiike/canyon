@@ -50,7 +50,7 @@ type Serializer struct {
 }
 
 // Serialize does serialize http.Request as SQS Message.
-func (s *Serializer) Serialize(ctx context.Context, r *http.Request, messageAttrs map[string]events.SQSMessageAttribute) (*events.SQSMessage, error) {
+func (s *Serializer) Serialize(ctx context.Context, r *http.Request) (*events.SQSMessage, error) {
 	sr := &JSONSerializableRequest{
 		Method:        r.Method,
 		Header:        r.Header,
@@ -78,14 +78,13 @@ func (s *Serializer) Serialize(ctx context.Context, r *http.Request, messageAttr
 		return nil, fmt.Errorf("failed to marshal request: %w", err)
 	}
 	msg := &events.SQSMessage{
-		Body:              string(bs),
-		MessageAttributes: messageAttrs,
+		Body: string(bs),
 	}
 	return msg, nil
 }
 
 // Deserialize does deserialize SQS Message as http.Request.
-func (s *Serializer) Deserialize(ctx context.Context, message *events.SQSMessage) (*http.Request, error) {
+func (s *Serializer) Deserialize(ctx context.Context, message events.SQSMessage) (*http.Request, error) {
 	sr := &JSONSerializableRequest{}
 	if err := json.Unmarshal([]byte(message.Body), sr); err != nil {
 		return nil, fmt.Errorf("failed to unmarshal request: %w", err)
@@ -167,24 +166,15 @@ func (s *Serializer) Deserialize(ctx context.Context, message *events.SQSMessage
 }
 
 // NewSendMessageInput does create SendMessageInput from http.Request.
-func (s *Serializer) NewSendMessageInput(ctx context.Context, sqsQueueURL string, r *http.Request, messageAttrs map[string]events.SQSMessageAttribute) (*sqs.SendMessageInput, error) {
-	msg, err := s.Serialize(ctx, r, messageAttrs)
+func (s *Serializer) NewSendMessageInput(ctx context.Context, sqsQueueURL string, r *http.Request, messageAttrs map[string]types.MessageAttributeValue) (*sqs.SendMessageInput, error) {
+	msg, err := s.Serialize(ctx, r)
 	if err != nil {
 		return nil, fmt.Errorf("failed to serialize request: %w", err)
 	}
 	params := &sqs.SendMessageInput{
 		MessageBody:       aws.String(msg.Body),
 		QueueUrl:          aws.String(sqsQueueURL),
-		MessageAttributes: make(map[string]types.MessageAttributeValue, len(msg.MessageAttributes)),
-	}
-	for name, attr := range msg.MessageAttributes {
-		params.MessageAttributes[name] = types.MessageAttributeValue{
-			DataType:         aws.String(attr.DataType),
-			StringValue:      attr.StringValue,
-			StringListValues: attr.StringListValues,
-			BinaryValue:      attr.BinaryValue,
-			BinaryListValues: attr.BinaryListValues,
-		}
+		MessageAttributes: messageAttrs,
 	}
 	return params, nil
 }

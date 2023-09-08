@@ -31,7 +31,7 @@ func TestSerializerSerialize__NonBackend(t *testing.T) {
 	require.NoError(t, err, "should create request")
 
 	var serializer Serializer
-	serialized, err := serializer.Serialize(context.Background(), req, nil)
+	serialized, err := serializer.Serialize(context.Background(), req)
 	require.NoError(t, err, "should serialize request")
 
 	require.JSONEq(t, string(ReadFile(t, "testdata/serialized_http_request.json")), string(serialized.Body), "same as expected serialized request")
@@ -43,7 +43,7 @@ func TestSerializerSerialize__MockBackend(t *testing.T) {
 
 	var serializer Serializer
 	serializer.Backend = &mockBackend{}
-	serialized, err := serializer.Serialize(context.Background(), req, nil)
+	serialized, err := serializer.Serialize(context.Background(), req)
 	require.NoError(t, err, "should serialize request")
 
 	require.JSONEq(t, string(ReadFile(t, "testdata/serialized_http_request_with_mock_backend.json")), string(serialized.Body), "same as expected serialized request")
@@ -54,7 +54,7 @@ func TestSerializerDesirialize__NonBackend(t *testing.T) {
 	message := sqsEvent.Records[0]
 
 	var serializer Serializer
-	req, err := serializer.Deserialize(context.Background(), &message)
+	req, err := serializer.Deserialize(context.Background(), message)
 	require.NoError(t, err, "should deserialize request")
 
 	require.Equal(t, "POST", req.Method, "should be POST")
@@ -75,7 +75,7 @@ func TestSerializerDesirialize__MockBackend(t *testing.T) {
 
 	var serializer Serializer
 	serializer.Backend = &mockBackend{}
-	req, err := serializer.Deserialize(context.Background(), &message)
+	req, err := serializer.Deserialize(context.Background(), message)
 	require.NoError(t, err, "should deserialize request")
 
 	require.Equal(t, "POST", req.Method, "should be POST")
