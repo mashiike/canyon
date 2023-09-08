@@ -223,6 +223,54 @@ func TestWorkerLogic(t *testing.T) {
 }
 ```
 
+## For local development
+
+`canyon.WithCanyonEnv(env)` option is helper option for local development.
+this options is flexible option. 
+if pass `development` to `env` argument, return multiple options (`canyon.WithInMemoryQueue()` and `canyon.WithFileBackend()`, `canyon.WithVerbose()`).
+file backend setup temporary directory.
+if pass `test` to `env` argument, return multiple options (`canyon.WithInMemoryQueue()` and `canyon.WithInMemoryBackend()`).
+
+for example default usage is
+
+```go
+package main
+
+//...
+
+func main() {
+//...
+    b, err := canyon.NewS3Backend("s3://bucket-name/prefix")
+    if err != nil {
+        slog.Error("failed to create s3 backend", "error", err)
+        os.Exit(1)
+    }
+    b.SetUploaderName("your-app-name") // if not set, default is "canyon"
+    opts := []canyon.Option{
+        canyon.WithServerAddress(":8080", "/"),
+        canyon.WithBackend(b),
+        canyon.WithCanyonEnv(os.Getenv("CANYON_ENV")),
+    }
+    err := canyon.RunWithContext(ctx, "your-sqs-queue-name", http.HandlerFunc(handler), opts...)
+    if err != nil {
+        slog.Error("failed to run canyon", "error", err)
+        os.Exit(1)
+    }
+}
+```
+set to last of options.
+
+```shell
+$ CANYON_ENV=development go run main.go
+```
+work as local development mode. using in memory queue and temporary file backend.
+
+```shell
+$ CANYON_ENV=production go run main.go
+```
+work as production mode. using AWS SQS and AWS S3.
+
+
 ## LICENSE
 
 MIT
