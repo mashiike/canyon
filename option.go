@@ -288,7 +288,7 @@ func WithCanyonEnv(envPrefix string) Option {
 				c.cancel(fmt.Errorf("create temporary file backend: %w", err))
 				return
 			}
-			c.logger.Info("create temporary file backend, canyon request body upload to temporary directoy", "path", tmp)
+			c.logger.Info("create temporary file backend, canyon request body upload to temporary directory", "path", tmp)
 			opts = append(opts, WithBackend(b))
 		case "test":
 			opts = append(opts, WithInMemoryQueue(30*time.Second, 3, nil))
