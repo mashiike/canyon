@@ -19,6 +19,7 @@ func main() {
 
 	opts := []canyon.Option{
 		canyon.WithServerAddress(":8080", "/"),
+		canyon.WithVarbose(),
 	}
 	if os.Getenv("CANYON_S3_BACKEND") != "" {
 		b, err := canyon.NewS3Backend(os.Getenv("CANYON_S3_BACKEND"))
