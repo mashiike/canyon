@@ -30,7 +30,7 @@ func TestSerializerSerialize__NonBackend(t *testing.T) {
 	req, err := ridge.NewRequest(ReadFile(t, "testdata/http_event.json"))
 	require.NoError(t, err, "should create request")
 
-	var serializer Serializer
+	serializer := NewSerializer(nil)
 	serialized, err := serializer.Serialize(context.Background(), req)
 	require.NoError(t, err, "should serialize request")
 
@@ -41,8 +41,7 @@ func TestSerializerSerialize__MockBackend(t *testing.T) {
 	req, err := ridge.NewRequest(ReadFile(t, "testdata/http_event.json"))
 	require.NoError(t, err, "should create request")
 
-	var serializer Serializer
-	serializer.Backend = &mockBackend{}
+	serializer := NewSerializer(&mockBackend{})
 	serialized, err := serializer.Serialize(context.Background(), req)
 	require.NoError(t, err, "should serialize request")
 
@@ -53,7 +52,7 @@ func TestSerializerDesirialize__NonBackend(t *testing.T) {
 	sqsEvent := ReadJSON[events.SQSEvent](t, "testdata/sqs_event.json")
 	message := sqsEvent.Records[0]
 
-	var serializer Serializer
+	serializer := NewSerializer(nil)
 	req, err := serializer.Deserialize(context.Background(), message)
 	require.NoError(t, err, "should deserialize request")
 
@@ -93,8 +92,7 @@ func TestSerializerDesirialize__MockBackend(t *testing.T) {
 	sqsEvent := ReadJSON[events.SQSEvent](t, "testdata/sqs_event_with_mock_backend.json")
 	message := sqsEvent.Records[0]
 
-	var serializer Serializer
-	serializer.Backend = &mockBackend{}
+	serializer := NewSerializer(&mockBackend{})
 	req, err := serializer.Deserialize(context.Background(), message)
 	require.NoError(t, err, "should deserialize request")
 

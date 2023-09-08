@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"log/slog"
 	"net/http"
 	"net/url"
 	"strings"
@@ -47,6 +48,18 @@ type Backend interface {
 // Serializer is a struct for Serialize and Deserialize http.Request as SQS Message.
 type Serializer struct {
 	Backend Backend
+	Logger  *slog.Logger
+}
+
+func NewSerializer(backend Backend) *Serializer {
+	return &Serializer{
+		Backend: backend,
+		Logger:  slog.New(slog.NewTextHandler(io.Discard, &slog.HandlerOptions{Level: slog.LevelError})),
+	}
+}
+
+func (s *Serializer) SetLogger(logger *slog.Logger) {
+	s.Logger = logger
 }
 
 // Serialize does serialize http.Request as SQS Message.
@@ -60,7 +73,7 @@ func (s *Serializer) Serialize(ctx context.Context, r *http.Request) (*events.SQ
 		RequestURI:    r.RequestURI,
 		URL:           r.URL.String(),
 	}
-	if s.Backend == nil {
+	if s.Backend == nil || r.ContentLength == 0 {
 		bs, err := io.ReadAll(r.Body)
 		if err != nil {
 			return nil, fmt.Errorf("failed to read request body: %w", err)
@@ -71,6 +84,7 @@ func (s *Serializer) Serialize(ctx context.Context, r *http.Request) (*events.SQ
 		if err != nil {
 			return nil, fmt.Errorf("failed to save request body: %w", err)
 		}
+		slog.InfoContext(ctx, "saved request body", "url", backendURL.String())
 		sr.BackendURL = aws.String(backendURL.String())
 	}
 	bs, err := json.Marshal(sr)

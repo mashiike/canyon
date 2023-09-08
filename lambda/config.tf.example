@@ -17,3 +17,9 @@ terraform {
     region = "ap-northeast-1"
   }
 }
+
+
+locals {
+  canyon_temporary_bucket_arn = "<your-temprary-bucket-arn>"
+}
+
