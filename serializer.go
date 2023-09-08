@@ -84,7 +84,7 @@ func (s *Serializer) Serialize(ctx context.Context, r *http.Request) (*events.SQ
 		if err != nil {
 			return nil, fmt.Errorf("failed to save request body: %w", err)
 		}
-		slog.InfoContext(ctx, "saved request body", "url", backendURL.String())
+		slog.InfoContext(ctx, "saved request body", "uploaded_url", backendURL.String(), "request_uri", r.RequestURI)
 		sr.BackendURL = aws.String(backendURL.String())
 	}
 	bs, err := json.Marshal(sr)
