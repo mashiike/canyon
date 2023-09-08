@@ -1,5 +1,11 @@
 # Changelog
 
+## [v0.2.0](https://github.com/mashiike/canyon/compare/v0.1.0...v0.2.0) - 2023-09-08
+- rename SendToSQS => SendToWorker by @mashiike in https://github.com/mashiike/canyon/pull/6
+- s3 backend by @mashiike in https://github.com/mashiike/canyon/pull/8
+- canyontest is test helper package  by @mashiike in https://github.com/mashiike/canyon/pull/9
+- for local development helpfull option by @mashiike in https://github.com/mashiike/canyon/pull/10
+
 ## [v0.1.0](https://github.com/mashiike/canyon/commits/v0.1.0) - 2023-09-07
 - Bump actions/checkout from 3 to 4 by @dependabot in https://github.com/mashiike/canyon/pull/1
 - Bump github.com/stretchr/testify from 1.7.2 to 1.8.4 by @dependabot in https://github.com/mashiike/canyon/pull/3
