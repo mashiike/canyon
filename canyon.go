@@ -230,6 +230,9 @@ var LogComponentAttributeKey = "component"
 func newWorkerHandler(mux http.Handler, c *runOptions) sqsEventLambdaHandlerFunc {
 	logger := c.logger.With(slog.String(LogComponentAttributeKey, "worker"))
 	serializer := NewSerializer(c.backend)
+	if c.logVarbose {
+		serializer.SetLogger(logger)
+	}
 	return func(ctx context.Context, event *events.SQSEvent) (*events.SQSEventResponse, error) {
 		var mu sync.Mutex
 		var wg sync.WaitGroup
@@ -281,6 +284,9 @@ func newWorkerHandler(mux http.Handler, c *runOptions) sqsEventLambdaHandlerFunc
 func newServerHandler(mux http.Handler, c *runOptions) http.Handler {
 	logger := c.logger.With(slog.String(LogComponentAttributeKey, "server"))
 	serializer := NewSerializer(c.backend)
+	if c.logVarbose {
+		serializer.SetLogger(logger)
+	}
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		ctx := r.Context()
 		ctx = embedLoggerInContext(ctx, logger)
