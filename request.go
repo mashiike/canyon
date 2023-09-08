@@ -16,18 +16,6 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 )
 
-// JSONSerializableRequest is a request that can be serialized to JSON.
-type JSONSerializableRequest struct {
-	Method        string              `json:"method,omitempty"`
-	Header        map[string][]string `json:"header,omitempty"`
-	Body          string              `json:"body,omitempty"`
-	ContentLength int64               `json:"content_length,omitempty"`
-	RemoteAddr    string              `json:"remote_addr,omitempty"`
-	Host          string              `json:"host,omitempty"`
-	RequestURI    string              `json:"request_uri,omitempty"`
-	URL           string              `json:"url,omitempty"`
-}
-
 // NewJSONSerializableRequest creates JSONSerializableRequest from http.Request.
 func NewJSONSerializableRequest(r *http.Request) (*JSONSerializableRequest, error) {
 	bs, err := io.ReadAll(r.Body)
