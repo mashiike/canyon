@@ -3,6 +3,7 @@ package canyon
 import (
 	"bytes"
 	"crypto/md5"
+	"encoding/base64"
 	"fmt"
 	"io"
 	"math/rand"
@@ -12,6 +13,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/aws/aws-lambda-go/events"
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/sqs/types"
 )
@@ -73,6 +75,54 @@ func HeaderSQSMessageAttribute(name, dataType string) string {
 	return HeaderPrefixSQSMessageAttribute + dataType + "-" + camelCaseToKebabCase(name)
 }
 
+// Set SQS infomation to Request Header
+func SetSQSMessageHeader(r *http.Request, message events.SQSMessage) *http.Request {
+	r.Header.Set(HeaderSQSMessageId, message.MessageId)
+	r.Header.Set(HeaderSQSEventSource, message.EventSource)
+	r.Header.Set(HeaderSQSEventSourceArn, message.EventSourceARN)
+	r.Header.Set(HeaderSQSAwsRegionHeader, message.AWSRegion)
+	for k, v := range message.Attributes {
+		r.Header.Set(HeaderSQSAttribute(k), v)
+	}
+	for k, v := range message.MessageAttributes {
+		parts := strings.SplitN(v.DataType, ".", 2)
+		headerName := HeaderSQSMessageAttribute(k, parts[0])
+		if v.StringValue != nil {
+			switch parts[0] {
+			case "String", "Number":
+				r.Header.Add(headerName, *v.StringValue)
+			default:
+				r.Header.Add(headerName, base64.StdEncoding.EncodeToString([]byte(*v.StringValue)))
+			}
+		}
+		for _, s := range v.StringListValues {
+			switch parts[0] {
+			case "String", "Number":
+				r.Header.Add(headerName, s)
+			default:
+				r.Header.Add(headerName, base64.StdEncoding.EncodeToString([]byte(s)))
+			}
+		}
+		if v.BinaryValue != nil {
+			switch parts[0] {
+			case "String", "Number":
+				r.Header.Add(headerName, string(v.BinaryValue))
+			default:
+				r.Header.Add(headerName, base64.StdEncoding.EncodeToString(v.BinaryValue))
+			}
+		}
+		for _, b := range v.BinaryListValues {
+			switch parts[0] {
+			case "String", "Number":
+				r.Header.Add(headerName, string(b))
+			default:
+				r.Header.Add(headerName, base64.StdEncoding.EncodeToString(b))
+			}
+		}
+	}
+	return r
+}
+
 var randomReader = rand.New(rand.NewSource(time.Now().UnixNano()))
 
 func randomBytes(n int) []byte {
@@ -89,7 +139,7 @@ func md5Digest(s string) string {
 }
 
 // ToMessageAttributes converts http.Header to SQS MessageAttributes.
-func ToMessageAttributes(h http.Header) map[string]types.MessageAttributeValue {
+func ToMessageAttributes(h http.Header) MessageAttributes {
 	m := make(map[string]types.MessageAttributeValue, len(h))
 	for k, v := range h {
 		if len(v) == 0 {

@@ -165,6 +165,63 @@ and `canyon.IsWorker(r) == true` request, request body will be download from Bac
 `canyon.NewS3Backend("s3://bucket-name/prefix")` returns `canyon.S3Backend` instance.
 this instance is implementation of `canyon.Backend` interface with AWS S3. 
 
+## For testing  
+
+`caynontest` package is helper package for testing.
+this package like `httptest` package.
+for example
+
+```go
+func TestXXX(t *testing.T) {
+    h := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+        // your handler code
+        // can use canyon.IsWorker(r) and canyon.SendToWorker(r, nil)
+	})
+	r := canyontest.NewRunner(h)
+	defer r.Close()
+
+	resp, err := http.Post(r.URL, "application/json", strings.NewReader(`{"foo":"bar baz"}`))
+	if err != nil {
+		t.Fatal(err)
+	}
+    // your test code
+}
+```
+
+if you want to only handler test, use `canyontest.AsServer(h)` and `canontest.AsWorker(h)`.
+this is middleware for handler testing. not start real http server and sqs worker.
+
+```go
+func TestServerLogic(t *testing.T) {
+    h := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+        // your server logic code
+        // canyon.SendToWorker(r, nil)
+        // canyon.IsWorker(r) == false
+    })
+    sender := canyon.SQSMessageSenderFunc(func(r *http.Request, m canyon.MessageAttributes) (string, error) {
+        // call from canyon.SendToWorker()
+        return "message-id", nil
+    })
+    h = canyontest.AsServer(h)
+    r := httptest.NewRequest(http.MethodPost, "/", strings.NewReader(`{"foo":"bar baz"}`))
+    w := httptest.NewRecorder()
+    h.ServeHTTP(w, r)
+    // your test code
+}
+
+func TestWorkerLogic(t *testing.T) {
+    h := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+        // your worker logic code
+        // canyon.IsWorker(r) == true
+        // r.Header with Sqs-Message-Id, Sqs-Message-Attributes-... headers
+    })
+    h = canyontest.AsWorker(h)
+    r := httptest.NewRequest(http.MethodPost, "/", strings.NewReader(`{"foo":"bar baz"}`))
+    w := httptest.NewRecorder()
+    h.ServeHTTP(w, r)
+    // your test code
+}
+```
 
 ## LICENSE
 

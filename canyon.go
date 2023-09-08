@@ -293,25 +293,27 @@ func newServerHandler(mux http.Handler, c *runOptions) http.Handler {
 		ctx := r.Context()
 		ctx = embedLoggerInContext(ctx, logger)
 		ctx = EmbedIsWorkerInContext(ctx, false)
-		ctx = embedSQSMessageSenderInContext(ctx, func(r *http.Request, m map[string]types.MessageAttributeValue) (string, error) {
-			queueURL, client := c.SQSClientAndQueueURL()
-			l := Logger(r)
-			if c.logVarbose {
-				l.DebugContext(r.Context(), "try sqs send message with http request", "method", r.Method, "path", r.URL.Path)
-			}
-			input, err := serializer.NewSendMessageInput(ctx, queueURL, r, m)
-			if err != nil {
-				return "", fmt.Errorf("failed to create sqs message: %w", err)
-			}
-			output, err := client.SendMessage(r.Context(), input)
-			if err != nil {
-				return "", fmt.Errorf("failed to send sqs message: %w", err)
-			}
-			if c.logVarbose {
-				l.DebugContext(r.Context(), "success sqs message sent with http request", "message_id", *output.MessageId, "queue", c.sqsQueueName)
-			}
-			return *output.MessageId, nil
-		})
+		ctx = EmbedSQSMessageSenderInContext(ctx,
+			SQSMessageSenderFunc(func(r *http.Request, m MessageAttributes) (string, error) {
+				queueURL, client := c.SQSClientAndQueueURL()
+				l := Logger(r)
+				if c.logVarbose {
+					l.DebugContext(r.Context(), "try sqs send message with http request", "method", r.Method, "path", r.URL.Path)
+				}
+				input, err := serializer.NewSendMessageInput(ctx, queueURL, r, m)
+				if err != nil {
+					return "", fmt.Errorf("failed to create sqs message: %w", err)
+				}
+				output, err := client.SendMessage(r.Context(), input)
+				if err != nil {
+					return "", fmt.Errorf("failed to send sqs message: %w", err)
+				}
+				if c.logVarbose {
+					l.DebugContext(r.Context(), "success sqs message sent with http request", "message_id", *output.MessageId, "queue", c.sqsQueueName)
+				}
+				return *output.MessageId, nil
+			}),
+		)
 		mux.ServeHTTP(w, r.WithContext(ctx))
 	})
 }
@@ -321,5 +323,5 @@ func SendToWorker(r *http.Request, messageAttrs map[string]types.MessageAttribut
 	if sqsMessageSender == nil {
 		return "", errors.New("sqs message sender is not set: may be worker or not running with canyon")
 	}
-	return sqsMessageSender(r, messageAttrs)
+	return sqsMessageSender.SendMessage(r, messageAttrs)
 }

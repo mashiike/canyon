@@ -11,7 +11,6 @@ import (
 	"log/slog"
 	"net/http"
 	"net/url"
-	"strings"
 
 	"github.com/aws/aws-lambda-go/events"
 	"github.com/aws/aws-sdk-go-v2/aws"
@@ -133,49 +132,7 @@ func (s *Serializer) Deserialize(ctx context.Context, message events.SQSMessage)
 		r.Body = io.NopCloser(bytes.NewReader(bs))
 
 	}
-	r.Header.Set(HeaderSQSMessageId, message.MessageId)
-	r.Header.Set(HeaderSQSEventSource, message.EventSource)
-	r.Header.Set(HeaderSQSEventSourceArn, message.EventSourceARN)
-	r.Header.Set(HeaderSQSAwsRegionHeader, message.AWSRegion)
-	for k, v := range message.Attributes {
-		r.Header.Set(HeaderSQSAttribute(k), v)
-	}
-	for k, v := range message.MessageAttributes {
-		parts := strings.SplitN(v.DataType, ".", 2)
-		headerName := HeaderSQSMessageAttribute(k, parts[0])
-		if v.StringValue != nil {
-			switch parts[0] {
-			case "String", "Number":
-				r.Header.Add(headerName, *v.StringValue)
-			default:
-				r.Header.Add(headerName, base64.StdEncoding.EncodeToString([]byte(*v.StringValue)))
-			}
-		}
-		for _, s := range v.StringListValues {
-			switch parts[0] {
-			case "String", "Number":
-				r.Header.Add(headerName, s)
-			default:
-				r.Header.Add(headerName, base64.StdEncoding.EncodeToString([]byte(s)))
-			}
-		}
-		if v.BinaryValue != nil {
-			switch parts[0] {
-			case "String", "Number":
-				r.Header.Add(headerName, string(v.BinaryValue))
-			default:
-				r.Header.Add(headerName, base64.StdEncoding.EncodeToString(v.BinaryValue))
-			}
-		}
-		for _, b := range v.BinaryListValues {
-			switch parts[0] {
-			case "String", "Number":
-				r.Header.Add(headerName, string(b))
-			default:
-				r.Header.Add(headerName, base64.StdEncoding.EncodeToString(b))
-			}
-		}
-	}
+	r = SetSQSMessageHeader(r, message)
 	return r, nil
 }
 
