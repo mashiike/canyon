@@ -300,25 +300,15 @@ func WithCanyonEnv(envPrefix string) Option {
 					c.cancel(fmt.Errorf("parse backend url: %w", err))
 					return
 				}
-				var b Backend
-				switch u.Scheme {
-				case "s3":
-					s3Backend, err := NewS3Backend(urlStr)
-					if err != nil {
-						c.cancel(fmt.Errorf("create s3 backend: %w", err))
-						return
-					}
-					s3Backend.SetUploaderName(envPrefix + os.Getenv("S3_UPLOADER_NAME"))
-					b = s3Backend
-				case "file":
-					b, err = NewFileBackend(u.Path)
-					if err != nil {
-						c.cancel(fmt.Errorf("create file backend: %w", err))
-						return
-					}
-				default:
-					c.cancel(fmt.Errorf("invalid backend url: %s", urlStr))
+				b, err := NewBackend(u)
+				if err != nil {
+					c.cancel(fmt.Errorf("create backend: %w", err))
 					return
+				}
+				if appName := os.Getenv(envPrefix + "BACKEND_SAVE_APP_NAME"); appName != "" {
+					if b, ok := b.(AppNameSetable); ok {
+						b.SetAppName(appName)
+					}
 				}
 				opts = append(opts, WithBackend(b))
 			}

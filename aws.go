@@ -498,10 +498,10 @@ func (b *S3Backend) SetS3Client(s3Client S3Client) {
 	b.downloader = manager.NewDownloader(s3Client)
 }
 
-// SetUploaderName sets uploader name to S3Backend.
+// SetAppName sets uploader name to S3Backend.
 //
 //	this value is used for metadata of S3 object.
-func (b *S3Backend) SetUploaderName(name string) {
+func (b *S3Backend) SetAppName(name string) {
 	b.uploaderName = name
 }
 
