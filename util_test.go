@@ -68,3 +68,23 @@ func TestGetExtension(t *testing.T) {
 		require.Equal(t, c[1], getExtension(c[0]), fmt.Sprintf("should get extension `%s`->`%s`", c[0], c[1]))
 	}
 }
+
+func TestParseURL(t *testing.T) {
+	cases := [][]string{
+		{"http://example.com", "http", "example.com", ""},
+		{"https://example.com/hoge", "https", "example.com", "/hoge"},
+		{"s3://example.com/hoge", "s3", "example.com", "/hoge"},
+		{"s3://example.com/hoge/fuga", "s3", "example.com", "/hoge/fuga"},
+		{"file:///hoge/fuga", "file", "", "/hoge/fuga"},
+		{"file:///hoge/fuga/", "file", "", "/hoge/fuga/"},
+		{"./hoge/fuga", "file", "", "./hoge/fuga"},
+		{"./", "file", "", "./"},
+	}
+	for _, c := range cases {
+		u, err := parseURL(c[0])
+		require.NoError(t, err, "should parse url")
+		require.Equal(t, c[1], u.Scheme, "should have scheme")
+		require.Equal(t, c[2], u.Host, "should have host")
+		require.Equal(t, c[3], u.Path, "should have path")
+	}
+}

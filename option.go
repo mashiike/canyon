@@ -60,6 +60,7 @@ type runOptions struct {
 	responseChecker                WorkerResponseChecker
 	disableWorker                  bool
 	disableServer                  bool
+	cleanupFuncs                   []func()
 }
 
 func (c *runOptions) SQSClientAndQueueURL() (string, SQSClient) {
@@ -95,9 +96,16 @@ func (c *runOptions) DebugWhenVarbose(msg string, keysAndValues ...interface{}) 
 		c.logger.Debug(msg, keysAndValues...)
 	}
 }
+
 func (c *runOptions) DebugContextWhenVarbose(ctx context.Context, msg string, keysAndValues ...interface{}) {
 	if c.logVarbose {
 		c.logger.DebugContext(ctx, msg, keysAndValues...)
+	}
+}
+
+func (c *runOptions) InfoWhenVarbose(msg string, keysAndValues ...interface{}) {
+	if c.logVarbose {
+		c.logger.Info(msg, keysAndValues...)
 	}
 }
 
@@ -110,6 +118,14 @@ func (c *runOptions) InfoContextWhenVarbose(ctx context.Context, msg string, key
 func (c *runOptions) WarnContextWhenVarbose(ctx context.Context, msg string, keysAndValues ...interface{}) {
 	if c.logVarbose {
 		c.logger.WarnContext(ctx, msg, keysAndValues...)
+	}
+}
+
+func (c *runOptions) Cleanup() {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	for _, f := range c.cleanupFuncs {
+		f()
 	}
 }
 
@@ -281,33 +297,50 @@ func WithBackend(b Backend) Option {
 //	if url schema is file, set file backend.
 func WithCanyonEnv(envPrefix string) Option {
 	return func(c *runOptions) {
-		opts := []Option{}
 		if envPrefix == "" {
 			envPrefix = "CANYON_"
 		}
 		env := os.Getenv(envPrefix + "ENV")
 		switch strings.ToLower(env) {
 		case "development":
-			opts = append(opts, WithVarbose())
-			opts = append(opts, WithInMemoryQueue(30*time.Second, 3, nil))
-			tmp, err := os.MkdirTemp(os.TempDir(), "canon-*")
-			if err != nil {
-				c.cancel(fmt.Errorf("create temporary directory: %w", err))
-				return
-			}
-			b, err := NewFileBackend(tmp)
-			if err != nil {
-				c.cancel(fmt.Errorf("create temporary file backend: %w", err))
-				return
-			}
-			c.logger.Info("create temporary file backend, canyon request body upload to temporary directory", "path", tmp)
-			opts = append(opts, WithBackend(b))
-		case "test":
-			opts = append(opts, WithInMemoryQueue(30*time.Second, 3, nil))
-			opts = append(opts, WithBackend(NewInMemoryBackend()))
-		default:
+			WithVarbose()(c)
+			WithInMemoryQueue(30*time.Second, 3, nil)(c)
+			var backendPath string
 			if urlStr := os.Getenv(envPrefix + "BACKEND_URL"); urlStr != "" {
-				u, err := url.Parse(urlStr)
+				if u, err := parseURL(urlStr); err == nil && u.Scheme == "file" {
+					backendPath = u.Path
+					c.InfoWhenVarbose("create file backend, canyon request body upload to directory", "path", backendPath)
+				}
+			}
+			if backendPath == "" {
+				tmp, err := os.MkdirTemp(os.TempDir(), "canon-*")
+				if err != nil {
+					c.cancel(fmt.Errorf("create temporary directory: %w", err))
+					return
+				}
+				backendPath = tmp
+				c.cleanupFuncs = append(c.cleanupFuncs, func() {
+					c.InfoWhenVarbose("remove temporary file backend", "path", tmp)
+					if err := os.RemoveAll(tmp); err != nil {
+						c.logger.Error("failed to remove temporary directory", "path", tmp, "error", err)
+					}
+				})
+				c.InfoWhenVarbose("create temporary file backend, canyon request body upload to temporary directory", "path", tmp)
+			}
+			c.DebugWhenVarbose("try to create file backend", "path", backendPath)
+			b, err := NewFileBackend(backendPath)
+			if err != nil {
+				c.cancel(fmt.Errorf("create file backend: %w", err))
+				return
+			}
+			WithBackend(b)(c)
+		case "test":
+			WithInMemoryQueue(30*time.Second, 3, nil)(c)
+			WithBackend(NewInMemoryBackend())(c)
+		default:
+			env = "production"
+			if urlStr := os.Getenv(envPrefix + "BACKEND_URL"); urlStr != "" {
+				u, err := parseURL(urlStr)
 				if err != nil {
 					c.cancel(fmt.Errorf("parse backend url: %w", err))
 					return
@@ -322,12 +355,9 @@ func WithCanyonEnv(envPrefix string) Option {
 						b.SetAppName(appName)
 					}
 				}
-				opts = append(opts, WithBackend(b))
+				WithBackend(b)(c)
 			}
 		}
 		c.logger.Info("running canyon", "env", env)
-		for _, opt := range opts {
-			opt(c)
-		}
 	}
 }

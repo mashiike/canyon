@@ -35,6 +35,9 @@ func RunWithContext(ctx context.Context, sqsQueueName string, mux http.Handler, 
 			opt(c)
 		}
 	}
+	defer func() {
+		c.Cleanup()
+	}()
 	select {
 	case <-ctx.Done():
 		return context.Cause(ctx)
@@ -44,10 +47,17 @@ func RunWithContext(ctx context.Context, sqsQueueName string, mux http.Handler, 
 		return errors.New("both worker and server are disabled")
 	}
 	if err := runWithContext(ctx, mux, c); err != nil {
-		cancel(err)
-		return err
+		if !errors.Is(err, context.Canceled) && !errors.Is(err, context.DeadlineExceeded) {
+			cancel(err)
+			return err
+		}
 	}
-	return context.Cause(ctx)
+	if err := context.Cause(ctx); err != nil {
+		if !errors.Is(err, context.Canceled) && !errors.Is(err, context.DeadlineExceeded) {
+			return err
+		}
+	}
+	return nil
 }
 
 func runWithContext(ctx context.Context, mux http.Handler, c *runOptions) error {
@@ -94,7 +104,7 @@ func runWithContext(ctx context.Context, mux http.Handler, c *runOptions) error 
 		return nil
 	}
 	if c.useFakeSQSRunOnLocal {
-		c.logger.Info("enable on memory queue", "visibility_timeout", c.fakeSQSClientVisibilityTimeout, "max_receive_count", c.fakeSQSClientMaxReceiveCount)
+		c.logger.Info("enable in memory queue", "visibility_timeout", c.fakeSQSClientVisibilityTimeout.String(), "max_receive_count", c.fakeSQSClientMaxReceiveCount)
 		fakeClient := &fakeSQSClient{
 			visibilityTimeout: c.fakeSQSClientVisibilityTimeout,
 			maxReceiveCount:   int(c.fakeSQSClientMaxReceiveCount),
@@ -126,6 +136,7 @@ func runWithContext(ctx context.Context, mux http.Handler, c *runOptions) error 
 		}
 	} else {
 		listener = c.listener
+		c.address = listener.Addr().String()
 		c.logger.InfoContext(ctx, "starting up with local httpd", "address", listener.Addr().String())
 	}
 	if c.proxyProtocol {

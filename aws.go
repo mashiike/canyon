@@ -69,7 +69,7 @@ func (svc *sqsLongPollingService) Start(ctx context.Context, fn sqsEventLambdaHa
 	if svc.logger == nil {
 		svc.logger = slog.New(slog.NewTextHandler(io.Discard, &slog.HandlerOptions{}))
 	}
-	urlObj, err := url.Parse(svc.queueURL)
+	urlObj, err := parseURL(svc.queueURL)
 	if err != nil {
 		return fmt.Errorf("invalid queue url: %w", err)
 	}
@@ -193,11 +193,11 @@ func (svc *sqsLongPollingService) Start(ctx context.Context, fn sqsEventLambdaHa
 
 func convertQueueURLToARN(urlObj *url.URL) (*arn.ARN, error) {
 	if !strings.HasSuffix(strings.ToLower(urlObj.Host), ".amazonaws.com") || !strings.HasPrefix(strings.ToLower(urlObj.Host), "sqs.") {
-		return nil, errors.New("invalid queue url")
+		return nil, errors.New("invalid queue url: no sqs.*.amazon.com")
 	}
 	part := strings.Split(strings.TrimLeft(urlObj.Path, "/"), "/")
 	if len(part) != 2 {
-		return nil, errors.New("invalid queue url")
+		return nil, errors.New("invalid queue url: missing resource name")
 	}
 	awsRegion := strings.TrimSuffix(strings.TrimPrefix(strings.ToLower(urlObj.Host), "sqs."), ".amazonaws.com")
 	arnObj := &arn.ARN{
@@ -467,7 +467,7 @@ type S3Backend struct {
 
 // NewS3Backend creates a new S3Backend.
 func NewS3Backend(s3URLPrefix string) (*S3Backend, error) {
-	s3URL, err := url.Parse(s3URLPrefix)
+	s3URL, err := parseURL(s3URLPrefix)
 	if err != nil {
 		return nil, fmt.Errorf("parse failed url: %w", err)
 	}
