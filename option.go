@@ -131,10 +131,9 @@ func defaultRunConfig(cancel context.CancelCauseFunc, sqsQueueName string) *runO
 // WithContext returns a new Option that sets the local server listener.
 // this option for testing. normally, you should not use this option.
 // if production used, WithServerAddress() option.
-func WithListener(listener net.Listener, prefix string) Option {
+func WithListener(listener net.Listener) Option {
 	return func(c *runOptions) {
 		c.listener = listener
-		c.prefix = prefix
 	}
 }
 
@@ -192,6 +191,7 @@ func WithProxyProtocol() Option {
 func WithSQSClient(sqsClient SQSClient) Option {
 	return func(c *runOptions) {
 		c.sqsClient = sqsClient
+		c.useFakeSQSRunOnLocal = false
 	}
 }
 
@@ -204,12 +204,12 @@ func WithVarbose() Option {
 	}
 }
 
-// WithOnMemoryQueue returns a new Option that sets the mode of on memory queue.
+// WithInMemoryQueue returns a new Option that sets the mode of on memory queue.
 // if run on AWS Lambda, ignore this option.
 // if set this option, canyon not used real AWS SQS.
 // only used on memory queue.
 // for local development.
-func WithOnMemoryQueue(visibilityTimeout time.Duration, maxReceiveCount int64, dlq io.Writer) Option {
+func WithInMemoryQueue(visibilityTimeout time.Duration, maxReceiveCount int64, dlq io.Writer) Option {
 	return func(c *runOptions) {
 		c.useFakeSQSRunOnLocal = true
 		if dlq == nil {

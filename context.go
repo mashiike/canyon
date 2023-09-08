@@ -35,17 +35,34 @@ func embedLoggerInContext(ctx context.Context, logger *slog.Logger) context.Cont
 	return context.WithValue(ctx, contextKeyLogger, logger)
 }
 
-type sqsMessageSender func(*http.Request, map[string]types.MessageAttributeValue) (string, error)
+// MessageAttributes is a map of sqs message attributes.
+type MessageAttributes map[string]types.MessageAttributeValue
 
-func sqsMessageSenderFromContext(ctx context.Context) sqsMessageSender {
-	sender, ok := ctx.Value(contextKeySQSMessageSender).(sqsMessageSender)
+// SQSMessageSender is a interface for sending sqs message.
+// for testing, not for production use.
+type SQSMessageSender interface {
+	SendMessage(r *http.Request, attributes MessageAttributes) (string, error)
+}
+
+// SQSMessageSenderFunc is a func type for sending sqs message.
+// for testing, not for production use.
+type SQSMessageSenderFunc func(*http.Request, MessageAttributes) (string, error)
+
+func (f SQSMessageSenderFunc) SendMessage(r *http.Request, attributes MessageAttributes) (string, error) {
+	return f(r, attributes)
+}
+
+func sqsMessageSenderFromContext(ctx context.Context) SQSMessageSender {
+	sender, ok := ctx.Value(contextKeySQSMessageSender).(SQSMessageSender)
 	if !ok {
 		return nil
 	}
 	return sender
 }
 
-func embedSQSMessageSenderInContext(ctx context.Context, sender sqsMessageSender) context.Context {
+// EmbedSQSMessageSenderInContext embeds SQSMessageSender in context.
+// for testing, not for production use.
+func EmbedSQSMessageSenderInContext(ctx context.Context, sender SQSMessageSender) context.Context {
 	return context.WithValue(ctx, contextKeySQSMessageSender, sender)
 }
 
