@@ -12,7 +12,6 @@ import (
 	"time"
 
 	"github.com/aws/aws-sdk-go-v2/config"
-	"github.com/aws/aws-sdk-go-v2/service/s3"
 	"github.com/aws/aws-sdk-go-v2/service/sqs"
 )
 
@@ -46,8 +45,7 @@ type runOptions struct {
 	logger                         *slog.Logger
 	proxyProtocol                  bool
 	sqsClient                      SQSClient
-	s3Client                       S3Client
-	s3URLPrefix                    *url.URL
+	backend                        Backend
 	sqsQueueName                   string
 	sqsQueueURL                    string
 	useFakeSQSRunOnLocal           bool
@@ -99,26 +97,6 @@ func (c *runOptions) DebugContextWhenVarbose(ctx context.Context, msg string, ke
 	if c.logVarbose {
 		c.logger.DebugContext(ctx, msg, keysAndValues...)
 	}
-}
-
-func (c *runOptions) S3Client() S3Client {
-	c.mu.Lock()
-	defer c.mu.Unlock()
-	if c.s3Client == nil {
-		c.DebugWhenVarbose("s3 client is not initialized, try to load default config")
-		awsCfg, err := config.LoadDefaultConfig(context.Background())
-		if err != nil {
-			c.DebugWhenVarbose("failed to load aws default config, set context cancel", "error", err)
-			c.cancel(fmt.Errorf("load aws default config: %w", err))
-			return s3.New(s3.Options{})
-		}
-		c.s3Client = s3.NewFromConfig(awsCfg)
-	}
-	return c.s3Client
-}
-
-func (c *runOptions) EnableS3Backend() bool {
-	return c.s3URLPrefix != nil
 }
 
 // Option is a Run() and RunWtihContext() option.
@@ -217,15 +195,6 @@ func WithSQSClient(sqsClient SQSClient) Option {
 	}
 }
 
-// WithS3Client returns a new Option that sets the s3 client.
-// this option for testing. normally, you should not use this option.
-// default s3 client is loaded from aws default config.
-func WithS3Client(s3Client S3Client) Option {
-	return func(c *runOptions) {
-		c.s3Client = s3Client
-	}
-}
-
 // WithVarbose returns a new Option that sets the canyon loggign verbose.
 // this option for debugging canyon.
 // canyon will output many debug log.
@@ -275,23 +244,15 @@ func WithDisableServer() Option {
 	}
 }
 
-// WithS3Backend returns a new Option that sets the using s3 backend.
-// if set this option, canyon using s3 backend.
-// when send to sqs message, canyon upload request to s3
-// and sqs message body only contains s3 budket and object key.
+// WithBackend returns a new Option
+// if set this option, canyon using  backend.
+// when send to sqs message, canyon upload request to any backend.
+// and sqs message body set backend_url.
 //
 // SQS message body limit is 256KB. this option is useful for large request.
-func WithS3Backend(s3URLPrefix string) Option {
+// for example S3Backend is request body upload to s3.
+func WithBackend(b Backend) Option {
 	return func(c *runOptions) {
-		u, err := url.Parse(s3URLPrefix)
-		if err != nil {
-			c.cancel(fmt.Errorf("parse s3 url prefix: %w", err))
-			return
-		}
-		if !isS3URL(u) {
-			c.cancel(fmt.Errorf("invalid s3 url prefix: %s", s3URLPrefix))
-			return
-		}
-		c.s3URLPrefix = u
+		c.backend = b
 	}
 }
