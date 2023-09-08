@@ -223,13 +223,22 @@ func TestWorkerLogic(t *testing.T) {
 }
 ```
 
-## For local development
+## Envoiroment switch option `canyon.WithCanyonEnv(envPrefix)`
 
-`canyon.WithCanyonEnv(env)` option is helper option for local development.
-this options is flexible option. 
-if pass `development` to `env` argument, return multiple options (`canyon.WithInMemoryQueue()` and `canyon.WithFileBackend()`, `canyon.WithVerbose()`).
+`canyon.WithCanyonEnv(envPrefix)` option is helper option for environment switch.
+this options is flexible option. for example, case of envPrefix is `CANYON_` below.
+
+if `CAYNON_ENV=development`, return multiple options (`canyon.WithInMemoryQueue()` and `canyon.WithFileBackend()`, `canyon.WithVerbose()`).
 file backend setup temporary directory.
-if pass `test` to `env` argument, return multiple options (`canyon.WithInMemoryQueue()` and `canyon.WithInMemoryBackend()`).
+
+if `CANYON_ENV=test`,  return multiple options (`canyon.WithInMemoryQueue()` and `canyon.WithInMemoryBackend()`).
+
+other value, same as `CANYON_ENV=production`.
+in production mode, enable `CAYNON_BACKEND_URL`.
+this environment variable is backend url. for example `s3://bucket-name/prefix`, setup `canyon.NewS3Backend("s3://bucket-name/prefix")` and `canyon.WithBackend(...)` options.
+and if `CANYON_S3_UPLOADER_NAME` is set, set `canyon.S3Backend.SetUploaderName(...)`
+
+if backend url is `file:///tmp/canyon`, setup `canyon.NewFileBackend("/tmp/canyon")` and `canyon.WithBackend(...)` options.
 
 for example default usage is
 
@@ -240,16 +249,9 @@ package main
 
 func main() {
 //...
-    b, err := canyon.NewS3Backend("s3://bucket-name/prefix")
-    if err != nil {
-        slog.Error("failed to create s3 backend", "error", err)
-        os.Exit(1)
-    }
-    b.SetUploaderName("your-app-name") // if not set, default is "canyon"
     opts := []canyon.Option{
         canyon.WithServerAddress(":8080", "/"),
-        canyon.WithBackend(b),
-        canyon.WithCanyonEnv(os.Getenv("CANYON_ENV")),
+        canyon.WithCanyonEnv("CANYON_"),
     }
     err := canyon.RunWithContext(ctx, "your-sqs-queue-name", http.HandlerFunc(handler), opts...)
     if err != nil {

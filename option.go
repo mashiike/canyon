@@ -262,10 +262,18 @@ func WithBackend(b Backend) Option {
 // WithCanyonEnv returns a new Option env swith default options.
 // if env == "development", set varbose and in memory queue, temporary file backend.
 // if env == "test", set in memory queue, in memory backend.
-// otherwise, nothing to do.
-func WithCanyonEnv(env string) Option {
+// otherwise, setup backend with os.Getenv("CANYON_BACKEND_URL").
+//
+//	if url is empty, not set backend.
+//	if url schema is s3, set s3 backend.
+//	if url schema is file, set file backend.
+func WithCanyonEnv(envPrefix string) Option {
 	return func(c *runOptions) {
 		opts := []Option{}
+		if envPrefix == "" {
+			envPrefix = "CANYON_"
+		}
+		env := os.Getenv(envPrefix + "ENV")
 		switch strings.ToLower(env) {
 		case "development":
 			opts = append(opts, WithVarbose())
@@ -286,7 +294,34 @@ func WithCanyonEnv(env string) Option {
 			opts = append(opts, WithInMemoryQueue(30*time.Second, 3, nil))
 			opts = append(opts, WithBackend(NewInMemoryBackend()))
 		default:
-			// nothing to do
+			if urlStr := os.Getenv(envPrefix + "BACKEND_URL"); urlStr != "" {
+				u, err := url.Parse(urlStr)
+				if err != nil {
+					c.cancel(fmt.Errorf("parse backend url: %w", err))
+					return
+				}
+				var b Backend
+				switch u.Scheme {
+				case "s3":
+					s3Backend, err := NewS3Backend(urlStr)
+					if err != nil {
+						c.cancel(fmt.Errorf("create s3 backend: %w", err))
+						return
+					}
+					s3Backend.SetUploaderName(envPrefix + os.Getenv("S3_UPLOADER_NAME"))
+					b = s3Backend
+				case "file":
+					b, err = NewFileBackend(u.Path)
+					if err != nil {
+						c.cancel(fmt.Errorf("create file backend: %w", err))
+						return
+					}
+				default:
+					c.cancel(fmt.Errorf("invalid backend url: %s", urlStr))
+					return
+				}
+				opts = append(opts, WithBackend(b))
+			}
 		}
 		c.logger.Info("running canyon", "env", env)
 		for _, opt := range opts {
