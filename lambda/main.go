@@ -27,6 +27,7 @@ func main() {
 			slog.Error("failed to create s3 backend", "error", err)
 			os.Exit(1)
 		}
+		b.SetUploaderName("canyon-example")
 		opts = append(opts, canyon.WithBackend(b))
 	}
 	err := canyon.RunWithContext(ctx, "canyon-example", http.HandlerFunc(handler), opts...)

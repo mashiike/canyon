@@ -18,6 +18,7 @@ import (
 	"time"
 
 	"github.com/aws/aws-lambda-go/events"
+	"github.com/aws/aws-lambda-go/lambdacontext"
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/aws/arn"
 	"github.com/aws/aws-sdk-go-v2/config"
@@ -451,15 +452,18 @@ func (c *fakeSQSClient) MessageCount() int {
 	return len(c.messages)
 }
 
+// S3Backend is a backend for saving and loading request body to/from S3.
 type S3Backend struct {
-	s3URLPrefix *url.URL
-	once        sync.Once
-	initErr     error
-	s3Client    S3Client
-	uploader    *manager.Uploader
-	downloader  *manager.Downloader
+	s3URLPrefix  *url.URL
+	once         sync.Once
+	initErr      error
+	s3Client     S3Client
+	uploader     *manager.Uploader
+	downloader   *manager.Downloader
+	uploaderName string
 }
 
+// NewS3Backend creates a new S3Backend.
 func NewS3Backend(s3URLPrefix string) (*S3Backend, error) {
 	s3URL, err := url.Parse(s3URLPrefix)
 	if err != nil {
@@ -485,11 +489,20 @@ func (b *S3Backend) init() {
 	})
 }
 
+// SetS3Client sets S3Client to S3Backend.
+// for testing.
 func (b *S3Backend) SetS3Client(s3Client S3Client) {
 	b.initErr = nil
 	b.s3Client = s3Client
 	b.uploader = manager.NewUploader(s3Client)
 	b.downloader = manager.NewDownloader(s3Client)
+}
+
+// SetUploaderName sets uploader name to S3Backend.
+//
+//	this value is used for metadata of S3 object.
+func (b *S3Backend) SetUploaderName(name string) {
+	b.uploaderName = name
 }
 
 func (b *S3Backend) SaveRequestBody(ctx context.Context, req *http.Request) (*url.URL, error) {
@@ -514,14 +527,26 @@ func (b *S3Backend) SaveRequestBody(ctx context.Context, req *http.Request) (*ur
 		Body:        req.Body,
 		ContentType: aws.String(req.Header.Get("Content-Type")),
 		Metadata: map[string]string{
-			"Uploader":          "canyon",
-			"RequestURL":        req.URL.String(),
-			"RequestMethod":     req.Method,
-			"RequestRemoteAddr": req.RemoteAddr,
-			"RequestHost":       req.Host,
-			"RequestUserAgent":  req.UserAgent(),
-			"RequestTraceId":    req.Header.Get("X-Amzn-Trace-Id"),
+			"uploader":                         "canyon",
+			"request-url":                      req.URL.String(),
+			"request-method":                   req.Method,
+			"request-remote-addr":              req.RemoteAddr,
+			"request-host":                     req.Host,
+			"request-user-agent":               req.UserAgent(),
+			"request-traceId":                  req.Header.Get("X-Amzn-Trace-Id"),
+			"request-header-x-forwarded-for":   req.Header.Get("X-Forwarded-For"),
+			"request-header-x-forwarded-proto": req.Header.Get("X-Forwarded-Proto"),
+			"request-header-x-forwarded-port":  req.Header.Get("X-Forwarded-Port"),
 		},
+	}
+	if b.uploaderName != "" {
+		params.Metadata["uploader"] = b.uploaderName
+	}
+	lc, ok := lambdacontext.FromContext(ctx)
+	if ok {
+		params.Metadata["invoked-lambda-fuction-arn"] = lc.InvokedFunctionArn
+		params.Metadata["lambda-fuction-name"] = lambdacontext.FunctionName
+		params.Metadata["lambda-fuction-version"] = lambdacontext.FunctionVersion
 	}
 	defer req.Body.Close()
 	_, err := b.uploader.Upload(ctx, params)

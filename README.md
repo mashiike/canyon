@@ -30,7 +30,7 @@ func main() {
     opts := []canyon.Option{
         canyon.WithServerAddress(":8080", "/"),
     }
-    err := canyon.RunWithContext(ctx, "canyon-example", http.HandlerFunc(handler), opts...)
+    err := canyon.RunWithContext(ctx, "your-sqs-queue-name", http.HandlerFunc(handler), opts...)
     if err != nil {
         slog.Error("failed to run canyon", "error", err)
         os.Exit(1)
@@ -120,7 +120,7 @@ func main() {
             },
         )),
     }
-    err := canyon.RunWithContext(ctx, "canyon-example", http.HandlerFunc(handler), opts...)
+    err := canyon.RunWithContext(ctx, "your-sqs-queue-name", http.HandlerFunc(handler), opts...)
     if err != nil {
         slog.Error("failed to run canyon", "error", err)
         os.Exit(1)
@@ -144,11 +144,12 @@ func main() {
         slog.Error("failed to create s3 backend", "error", err)
         os.Exit(1)
     }
+    b.SetUploaderName("your-app-name") // if not set, default is "canyon"
     opts := []canyon.Option{
         canyon.WithServerAddress(":8080", "/"),
         canyon.WithBackend(b),
     }
-    err := canyon.RunWithContext(ctx, "canyon-example", http.HandlerFunc(handler), opts...)
+    err := canyon.RunWithContext(ctx, "your-sqs-queue-name", http.HandlerFunc(handler), opts...)
     if err != nil {
         slog.Error("failed to run canyon", "error", err)
         os.Exit(1)
