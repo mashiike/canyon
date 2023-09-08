@@ -61,9 +61,29 @@ func TestSerializerDesirialize__NonBackend(t *testing.T) {
 	require.Equal(t, "abcdefg.execute-api.ap-northeast-1.amazonaws.com", req.Host, "should be abcdefg.execute-api.ap-northeast-1.amazonaws.com")
 	require.Equal(t, "/", req.URL.Path, "should be /")
 	require.Equal(t, "203.0.113.1", req.RemoteAddr, "should be 203.0.113.1")
-	require.Equal(t, "00000000-0000-0000-0000-000000000000", req.Header.Get(HeaderSQSMessageId), "should be include sqs message id")
-	require.Equal(t, "aws:sqs", req.Header.Get(HeaderSQSEventSource), "should be include sqs event source")
-	require.Equal(t, "arn:aws:sqs:ap-northeast-1:123456789012:sqs-queue", req.Header.Get(HeaderSQSEventSourceArn), "should be include sqs event source arn")
+
+	expectedHeader := http.Header{
+		"Accept":               {"*/*"},
+		"Content-Length":       {"13"},
+		"Content-Type":         {"application/x-www-form-urlencoded"},
+		"User-Agent":           {"curl/7.68.0"},
+		"X-Amzn-Trace-Id":      {"Root=1-5e723db7-6077c85e0d781094f0c83e24"},
+		"X-Forwarded-For":      {"203.0.113.1"},
+		"X-Forwarded-Port":     {"443"},
+		"X-Forwarded-Proto":    {"https"},
+		"Sqs-Message-Id":       {"00000000-0000-0000-0000-000000000000"},
+		"Sqs-Event-Source":     {"aws:sqs"},
+		"Sqs-Event-Source-Arn": {"arn:aws:sqs:ap-northeast-1:123456789012:sqs-queue"},
+		"Sqs-Aws-Region":       {"ap-northeast-1"},
+		"Sqs-Attribute-Approximate-First-Receive-Timestamp": {"1693993542501"},
+		"Sqs-Attribute-Approximate-Receive-Count":           {"3"},
+		"Sqs-Attribute-Sender-Id":                           {"AROAIWPX5BD2BHG722MW4:sender"},
+		"Sqs-Attribute-Sent-Timestamp":                      {"1693993542490"},
+		"Sqs-Message-Attribute-String-Attribute1":           {"AttributeValue1"},
+		"Sqs-Message-Attribute-Number-Attribute2":           {"123", "1", "0"},
+		"Sqs-Message-Attribute-Binary-Attribute3":           {"YWJj", "MTIz", "MTEwMA==", "MA==", "MQ==", "MA=="},
+	}
+	require.EqualValues(t, expectedHeader, req.Header, "should have header")
 	err = req.ParseForm()
 	require.NoError(t, err, "should parse form")
 	require.Equal(t, "bar baz", req.Form.Get("foo"), "should be foo=bar%20baz")
