@@ -3,7 +3,9 @@
   "Environment": {
       "Variables": {
           "TZ": "Asia/Tokyo",
-          "CANYON_S3_BACKEND": "{{ env `CANYON_S3_BACKEND` }}"
+          "CANYON_BACKEND_URL": "{{ env `CANYON_S3_BACKEND` }}",
+          "CANYON_BACKEND_SAVE_APP_NAME": "canyon-example",
+          "CANYON_ENV": "production"
       }
   },
   "FunctionName": "canyon-example",

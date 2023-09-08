@@ -19,16 +19,7 @@ func main() {
 
 	opts := []canyon.Option{
 		canyon.WithServerAddress(":8080", "/"),
-		canyon.WithVarbose(),
-	}
-	if os.Getenv("CANYON_S3_BACKEND") != "" {
-		b, err := canyon.NewS3Backend(os.Getenv("CANYON_S3_BACKEND"))
-		if err != nil {
-			slog.Error("failed to create s3 backend", "error", err)
-			os.Exit(1)
-		}
-		b.SetUploaderName("canyon-example")
-		opts = append(opts, canyon.WithBackend(b))
+		canyon.WithCanyonEnv("CANYON_"), // environment variables prefix
 	}
 	err := canyon.RunWithContext(ctx, "canyon-example", http.HandlerFunc(handler), opts...)
 	if err != nil {

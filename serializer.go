@@ -31,19 +31,6 @@ type JSONSerializableRequest struct {
 	URL           string              `json:"url,omitempty"`
 }
 
-// Backend is interface for storing and loading data.
-type Backend interface {
-	// Save does store data.
-	// If data is stored successfully, return URL of stored data.
-	// If data is not stored successfully, return error.
-	SaveRequestBody(context.Context, *http.Request) (*url.URL, error)
-
-	// Load does load data from URL.
-	// If data is loaded successfully, return data.
-	// If data is not loaded successfully, return error.
-	LoadRequestBody(context.Context, *url.URL) (io.ReadCloser, error)
-}
-
 // Serializer is a struct for Serialize and Deserialize http.Request as SQS Message.
 type Serializer struct {
 	Backend Backend

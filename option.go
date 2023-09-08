@@ -8,6 +8,8 @@ import (
 	"net"
 	"net/http"
 	"net/url"
+	"os"
+	"strings"
 	"sync"
 	"time"
 
@@ -254,5 +256,66 @@ func WithDisableServer() Option {
 func WithBackend(b Backend) Option {
 	return func(c *runOptions) {
 		c.backend = b
+	}
+}
+
+// WithCanyonEnv returns a new Option env swith default options.
+// if env == "development", set varbose and in memory queue, temporary file backend.
+// if env == "test", set in memory queue, in memory backend.
+// otherwise, setup backend with os.Getenv("CANYON_BACKEND_URL").
+//
+//	if url is empty, not set backend.
+//	if url schema is s3, set s3 backend.
+//	if url schema is file, set file backend.
+func WithCanyonEnv(envPrefix string) Option {
+	return func(c *runOptions) {
+		opts := []Option{}
+		if envPrefix == "" {
+			envPrefix = "CANYON_"
+		}
+		env := os.Getenv(envPrefix + "ENV")
+		switch strings.ToLower(env) {
+		case "development":
+			opts = append(opts, WithVarbose())
+			opts = append(opts, WithInMemoryQueue(30*time.Second, 3, nil))
+			tmp, err := os.MkdirTemp(os.TempDir(), "canon-*")
+			if err != nil {
+				c.cancel(fmt.Errorf("create temporary directory: %w", err))
+				return
+			}
+			b, err := NewFileBackend(tmp)
+			if err != nil {
+				c.cancel(fmt.Errorf("create temporary file backend: %w", err))
+				return
+			}
+			c.logger.Info("create temporary file backend, canyon request body upload to temporary directory", "path", tmp)
+			opts = append(opts, WithBackend(b))
+		case "test":
+			opts = append(opts, WithInMemoryQueue(30*time.Second, 3, nil))
+			opts = append(opts, WithBackend(NewInMemoryBackend()))
+		default:
+			if urlStr := os.Getenv(envPrefix + "BACKEND_URL"); urlStr != "" {
+				u, err := url.Parse(urlStr)
+				if err != nil {
+					c.cancel(fmt.Errorf("parse backend url: %w", err))
+					return
+				}
+				b, err := NewBackend(u)
+				if err != nil {
+					c.cancel(fmt.Errorf("create backend: %w", err))
+					return
+				}
+				if appName := os.Getenv(envPrefix + "BACKEND_SAVE_APP_NAME"); appName != "" {
+					if b, ok := b.(AppNameSetable); ok {
+						b.SetAppName(appName)
+					}
+				}
+				opts = append(opts, WithBackend(b))
+			}
+		}
+		c.logger.Info("running canyon", "env", env)
+		for _, opt := range opts {
+			opt(c)
+		}
 	}
 }

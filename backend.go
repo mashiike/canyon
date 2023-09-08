@@ -14,6 +14,56 @@ import (
 	"github.com/google/uuid"
 )
 
+// Backend is interface for storing and loading data.
+type Backend interface {
+	// Save does store data.
+	// If data is stored successfully, return URL of stored data.
+	// If data is not stored successfully, return error.
+	SaveRequestBody(context.Context, *http.Request) (*url.URL, error)
+
+	// Load does load data from URL.
+	// If data is loaded successfully, return data.
+	// If data is not loaded successfully, return error.
+	LoadRequestBody(context.Context, *url.URL) (io.ReadCloser, error)
+}
+
+type AppNameSetable interface {
+	SetAppName(string)
+}
+
+var (
+	factoryMapMu sync.RWMutex
+	factoryMap   = map[string]func(*url.URL) (Backend, error){
+		"in-memory": func(*url.URL) (Backend, error) {
+			return NewInMemoryBackend(), nil
+		},
+		"file": func(u *url.URL) (Backend, error) {
+			return NewFileBackend(u.Path)
+		},
+		"s3": func(u *url.URL) (Backend, error) {
+			return NewS3Backend(u.String())
+		},
+	}
+)
+
+// RegisterBackendFactory registers backend factory.
+func RegisterBackendFactory(scheme string, factory func(*url.URL) (Backend, error)) {
+	factoryMapMu.Lock()
+	defer factoryMapMu.Unlock()
+	factoryMap[scheme] = factory
+}
+
+// NewBackend returns new Backend. with backend factory.
+func NewBackend(u *url.URL) (Backend, error) {
+	factoryMapMu.RLock()
+	defer factoryMapMu.RUnlock()
+	factory, ok := factoryMap[u.Scheme]
+	if !ok {
+		return nil, fmt.Errorf("backend factory not found: %s", u.Scheme)
+	}
+	return factory(u)
+}
+
 // InMemoryBackend is a backend for storing request body in memory.
 type InMemoryBackend struct {
 	mu                sync.RWMutex
