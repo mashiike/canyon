@@ -202,3 +202,22 @@ func getExtension(contentType string) string {
 	}
 	return ".bin"
 }
+
+func parseURL(urlStr string) (*url.URL, error) {
+	u, err := url.Parse(urlStr)
+	if err != nil {
+		return nil, err
+	}
+	if u.Scheme == "" {
+		u.Scheme = "file"
+	}
+	if u.Scheme == "file" {
+		if u.Host != "" {
+			return nil, fmt.Errorf("invalid file url: %s", urlStr)
+		}
+		if u.Path == "" {
+			return nil, fmt.Errorf("invalid file url: %s", urlStr)
+		}
+	}
+	return u, nil
+}

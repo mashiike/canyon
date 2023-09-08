@@ -10,7 +10,6 @@ import (
 	"io"
 	"log/slog"
 	"net/http"
-	"net/url"
 
 	"github.com/aws/aws-lambda-go/events"
 	"github.com/aws/aws-sdk-go-v2/aws"
@@ -102,7 +101,7 @@ func (s *Serializer) Deserialize(ctx context.Context, message events.SQSMessage)
 		if s.Backend == nil {
 			return nil, errors.New("backend is not set")
 		}
-		urlObj, err := url.Parse(*sr.BackendURL)
+		urlObj, err := parseURL(*sr.BackendURL)
 		if err != nil {
 			return nil, fmt.Errorf("failed to parse backend url: %w", err)
 		}
