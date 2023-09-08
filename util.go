@@ -75,7 +75,7 @@ func HeaderSQSMessageAttribute(name, dataType string) string {
 	return HeaderPrefixSQSMessageAttribute + dataType + "-" + camelCaseToKebabCase(name)
 }
 
-// Set SQS infomation to Request Header
+// Set SQS Message headers to Request
 func SetSQSMessageHeader(r *http.Request, message events.SQSMessage) *http.Request {
 	r.Header.Set(HeaderSQSMessageId, message.MessageId)
 	r.Header.Set(HeaderSQSEventSource, message.EventSource)
