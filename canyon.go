@@ -18,6 +18,10 @@ import (
 
 	"github.com/aws/aws-lambda-go/events"
 	"github.com/aws/aws-lambda-go/lambda"
+	"github.com/aws/aws-lambda-go/lambdacontext"
+	"github.com/aws/aws-sdk-go-v2/config"
+	sdklambda "github.com/aws/aws-sdk-go-v2/service/lambda"
+	lambdatypes "github.com/aws/aws-sdk-go-v2/service/lambda/types"
 	"github.com/aws/aws-sdk-go-v2/service/sqs/types"
 	"github.com/fujiwara/ridge"
 	"github.com/pires/go-proxyproto"
@@ -50,6 +54,11 @@ func RunWithContext(ctx context.Context, sqsQueueName string, mux http.Handler, 
 	return context.Cause(ctx)
 }
 
+var (
+	enableReportBatchItemFailures  map[string]bool = make(map[string]bool)
+	onceCheckFunctionResponseTypes sync.Once
+)
+
 func runWithContext(ctx context.Context, mux http.Handler, c *runOptions) error {
 	workerHandler := newWorkerHandler(mux, c)
 	serverHandler := newServerHandler(mux, c)
@@ -61,7 +70,60 @@ func runWithContext(ctx context.Context, mux http.Handler, c *runOptions) error 
 					return nil, err
 				}
 				if p.IsSQSEvent && !c.disableWorker {
-					return workerHandler(ctx, p.SQSEvent)
+					onceCheckFunctionResponseTypes.Do(func() {
+						defer func() {
+							for k, v := range enableReportBatchItemFailures {
+								if v {
+									c.logger.Info("enable report batch item failures", "event_source_arn", k)
+								}
+							}
+						}()
+
+						awsCfg, err := config.LoadDefaultConfig(ctx)
+						if err != nil {
+							return
+						}
+						lambdaClient := sdklambda.NewFromConfig(awsCfg)
+						lc, ok := lambdacontext.FromContext(ctx)
+						if !ok {
+							c.logger.Warn("missing lambda context for check function response types")
+							return
+						}
+						p := sdklambda.NewListEventSourceMappingsPaginator(lambdaClient, &sdklambda.ListEventSourceMappingsInput{
+							FunctionName: &lc.InvokedFunctionArn,
+						})
+						for p.HasMorePages() {
+							list, err := p.NextPage(ctx)
+							if err != nil {
+								c.logger.Warn("failed to list event source mappings", "error", err)
+								return
+							}
+							for _, m := range list.EventSourceMappings {
+								if m.EventSourceArn == nil {
+									continue
+								}
+								if !strings.HasPrefix(*m.EventSourceArn, "arn:aws:sqs:") {
+									continue
+								}
+								for _, v := range m.FunctionResponseTypes {
+									if v == lambdatypes.FunctionResponseTypeReportBatchItemFailures {
+										enableReportBatchItemFailures[*m.EventSourceArn] = true
+									}
+								}
+							}
+						}
+					})
+					resp, err := workerHandler(ctx, p.SQSEvent)
+					if err != nil {
+						return nil, err
+					}
+					if len(resp.BatchItemFailures) == 0 {
+						return resp, nil
+					}
+					if !enableReportBatchItemFailures[p.SQSEvent.Records[0].EventSourceARN] {
+						return resp, fmt.Errorf("failed processing %d records", len(resp.BatchItemFailures))
+					}
+					return resp, nil
 				}
 				if p.IsHTTPEvent && !c.disableServer {
 					r := p.Request.WithContext(ctx)
