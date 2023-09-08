@@ -131,10 +131,9 @@ func defaultRunConfig(cancel context.CancelCauseFunc, sqsQueueName string) *runO
 // WithContext returns a new Option that sets the local server listener.
 // this option for testing. normally, you should not use this option.
 // if production used, WithServerAddress() option.
-func WithListener(listener net.Listener, prefix string) Option {
+func WithListener(listener net.Listener) Option {
 	return func(c *runOptions) {
 		c.listener = listener
-		c.prefix = prefix
 	}
 }
 
@@ -192,6 +191,7 @@ func WithProxyProtocol() Option {
 func WithSQSClient(sqsClient SQSClient) Option {
 	return func(c *runOptions) {
 		c.sqsClient = sqsClient
+		c.useFakeSQSRunOnLocal = false
 	}
 }
 

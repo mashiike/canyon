@@ -31,7 +31,9 @@ func RunWithContext(ctx context.Context, sqsQueueName string, mux http.Handler, 
 	ctx, cancel := context.WithCancelCause(ctx)
 	c := defaultRunConfig(cancel, sqsQueueName)
 	for _, opt := range opts {
-		opt(c)
+		if opt != nil {
+			opt(c)
+		}
 	}
 	select {
 	case <-ctx.Done():
