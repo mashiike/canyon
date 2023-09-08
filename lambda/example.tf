@@ -58,6 +58,16 @@ data "aws_iam_policy_document" "canyon_example" {
     ]
   }
   statement {
+    resources = [
+      local.canyon_temporary_bucket_arn,
+      "${local.canyon_temporary_bucket_arn}/*"
+    ]
+    actions = [
+      "s3:PutObject",
+      "s3:GetObject",
+    ]
+  }
+  statement {
     actions = [
       "logs:GetLog*",
       "logs:CreateLogGroup",

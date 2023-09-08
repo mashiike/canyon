@@ -45,6 +45,7 @@ type runOptions struct {
 	logger                         *slog.Logger
 	proxyProtocol                  bool
 	sqsClient                      SQSClient
+	backend                        Backend
 	sqsQueueName                   string
 	sqsQueueURL                    string
 	useFakeSQSRunOnLocal           bool
@@ -240,5 +241,18 @@ func WithDisableWorker() Option {
 func WithDisableServer() Option {
 	return func(c *runOptions) {
 		c.disableServer = true
+	}
+}
+
+// WithBackend returns a new Option
+// if set this option, canyon using  backend.
+// when send to sqs message, canyon upload request to any backend.
+// and sqs message body set backend_url.
+//
+// SQS message body limit is 256KB. this option is useful for large request.
+// for example S3Backend is request body upload to s3.
+func WithBackend(b Backend) Option {
+	return func(c *runOptions) {
+		c.backend = b
 	}
 }

@@ -2,7 +2,8 @@
   "Description": "Example of canyon https://gitbub.com/mashiike/canyon",
   "Environment": {
       "Variables": {
-          "TZ": "Asia/Tokyo"
+          "TZ": "Asia/Tokyo",
+          "CANYON_S3_BACKEND": "{{ env `CANYON_S3_BACKEND` }}"
       }
   },
   "FunctionName": "canyon-example",

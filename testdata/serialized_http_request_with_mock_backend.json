@@ -1,0 +1,35 @@
+{
+  "method": "POST",
+  "header": {
+    "Accept": [
+      "*/*"
+    ],
+    "Content-Length": [
+      "13"
+    ],
+    "Content-Type": [
+      "application/x-www-form-urlencoded"
+    ],
+    "User-Agent": [
+      "curl/7.68.0"
+    ],
+    "X-Amzn-Trace-Id": [
+      "Root=1-5e723db7-6077c85e0d781094f0c83e24"
+    ],
+    "X-Forwarded-For": [
+      "203.0.113.1"
+    ],
+    "X-Forwarded-Port": [
+      "443"
+    ],
+    "X-Forwarded-Proto": [
+      "https"
+    ]
+  },
+  "content_length": 13,
+  "remote_addr": "203.0.113.1",
+  "host": "abcdefg.execute-api.ap-northeast-1.amazonaws.com",
+  "request_uri": "/",
+  "url": "/",
+  "backend_url": "file:///tmp/canyon_test"
+}
