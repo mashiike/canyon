@@ -60,6 +60,7 @@ type runOptions struct {
 	responseChecker                WorkerResponseChecker
 	disableWorker                  bool
 	disableServer                  bool
+	cleanupFuncs                   []func()
 }
 
 func (c *runOptions) SQSClientAndQueueURL() (string, SQSClient) {
@@ -278,17 +279,32 @@ func WithCanyonEnv(envPrefix string) Option {
 		case "development":
 			opts = append(opts, WithVarbose())
 			opts = append(opts, WithInMemoryQueue(30*time.Second, 3, nil))
-			tmp, err := os.MkdirTemp(os.TempDir(), "canon-*")
-			if err != nil {
-				c.cancel(fmt.Errorf("create temporary directory: %w", err))
-				return
+			var backendPath string
+			if urlStr := os.Getenv(envPrefix + "BACKEND_URL"); urlStr != "" && strings.HasPrefix(urlStr, "file://") {
+				if u, err := url.Parse(urlStr); err == nil {
+					backendPath = u.Path
+				}
 			}
-			b, err := NewFileBackend(tmp)
+			if backendPath == "" {
+				tmp, err := os.MkdirTemp(os.TempDir(), "canon-*")
+				if err != nil {
+					c.cancel(fmt.Errorf("create temporary directory: %w", err))
+					return
+				}
+				backendPath = tmp
+				c.cleanupFuncs = append(c.cleanupFuncs, func() {
+					c.logger.Info("remove temporary file backend", "path", tmp)
+					if err := os.RemoveAll(tmp); err != nil {
+						c.logger.Error("failed to remove temporary directory", "path", tmp, "error", err)
+					}
+				})
+				c.logger.Info("create temporary file backend, canyon request body upload to temporary directory", "path", tmp)
+			}
+			b, err := NewFileBackend(backendPath)
 			if err != nil {
 				c.cancel(fmt.Errorf("create temporary file backend: %w", err))
 				return
 			}
-			c.logger.Info("create temporary file backend, canyon request body upload to temporary directory", "path", tmp)
 			opts = append(opts, WithBackend(b))
 		case "test":
 			opts = append(opts, WithInMemoryQueue(30*time.Second, 3, nil))

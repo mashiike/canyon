@@ -35,6 +35,13 @@ func RunWithContext(ctx context.Context, sqsQueueName string, mux http.Handler, 
 			opt(c)
 		}
 	}
+	defer func() {
+		for _, cleanup := range c.cleanupFuncs {
+			if cleanup != nil {
+				cleanup()
+			}
+		}
+	}()
 	select {
 	case <-ctx.Done():
 		return context.Cause(ctx)
