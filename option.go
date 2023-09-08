@@ -204,12 +204,12 @@ func WithVarbose() Option {
 	}
 }
 
-// WithOnMemoryQueue returns a new Option that sets the mode of on memory queue.
+// WithInMemoryQueue returns a new Option that sets the mode of on memory queue.
 // if run on AWS Lambda, ignore this option.
 // if set this option, canyon not used real AWS SQS.
 // only used on memory queue.
 // for local development.
-func WithOnMemoryQueue(visibilityTimeout time.Duration, maxReceiveCount int64, dlq io.Writer) Option {
+func WithInMemoryQueue(visibilityTimeout time.Duration, maxReceiveCount int64, dlq io.Writer) Option {
 	return func(c *runOptions) {
 		c.useFakeSQSRunOnLocal = true
 		if dlq == nil {

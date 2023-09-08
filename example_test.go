@@ -72,7 +72,7 @@ func Example() {
 		})
 		opts := []canyon.Option{
 			canyon.WithListener(listener, "/"),
-			canyon.WithOnMemoryQueue(
+			canyon.WithInMemoryQueue(
 				30*time.Second, // on memory queue's default visibility timeout
 				10,             // on memory queue's default max receive count,
 				os.Stdout,      // if exceed max receive count, message will be sent to stdout as json
