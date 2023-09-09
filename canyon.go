@@ -69,6 +69,9 @@ func runWithContext(ctx context.Context, mux http.Handler, c *runOptions) error 
 			func(ctx context.Context, event json.RawMessage) (interface{}, error) {
 				var p eventPayload
 				if err := json.Unmarshal(event, &p); err != nil {
+					if c.lambdaFallbackHandler != nil {
+						return c.lambdaFallbackHandler.Invoke(ctx, event)
+					}
 					return nil, err
 				}
 				if p.IsSQSEvent && !c.disableWorker {
