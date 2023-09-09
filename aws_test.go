@@ -23,18 +23,18 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestFakeSQSClient(t *testing.T) {
+func TestinMemorySQSClient(t *testing.T) {
 	var logs bytes.Buffer
 	t.Cleanup(func() {
 		t.Log("Logs\n", logs.String())
 	})
-	fakeSQSClient := &fakeSQSClient{
+	inMemorySQSClient := &inMemorySQSClient{
 		visibilityTimeout: time.Second,
 		logger:            slog.New(slog.NewJSONHandler(&logs, &slog.HandlerOptions{Level: slog.LevelDebug})),
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
-	getQueueURLResult, err := fakeSQSClient.GetQueueUrl(ctx, &sqs.GetQueueUrlInput{
+	getQueueURLResult, err := inMemorySQSClient.GetQueueUrl(ctx, &sqs.GetQueueUrlInput{
 		QueueName: aws.String("test-queue"),
 	})
 	var wg sync.WaitGroup
@@ -43,7 +43,7 @@ func TestFakeSQSClient(t *testing.T) {
 		defer wg.Done()
 		require.NoError(t, err, "should get queue url")
 		require.Equal(t, "https://sqs.ap-northeast-1.amazonaws.com/123456789012/test-queue", *getQueueURLResult.QueueUrl, "should get queue url")
-		sendMessageResult, err := fakeSQSClient.SendMessage(ctx, &sqs.SendMessageInput{
+		sendMessageResult, err := inMemorySQSClient.SendMessage(ctx, &sqs.SendMessageInput{
 			QueueUrl:    getQueueURLResult.QueueUrl,
 			MessageBody: aws.String(`{"foo":"bar baz"}`),
 			MessageAttributes: map[string]types.MessageAttributeValue{
@@ -63,12 +63,12 @@ func TestFakeSQSClient(t *testing.T) {
 		})
 		require.NoError(t, err, "should send message")
 		require.NotEmpty(t, sendMessageResult.MessageId, "should have message id")
-		require.Equal(t, 1, fakeSQSClient.MessageCount(), "should have 1 message in fake sqs client")
+		require.Equal(t, 1, inMemorySQSClient.MessageCount(), "should have 1 message in fake sqs client")
 	}()
 	var receiptHandle string
 	go func() {
 		defer wg.Done()
-		receiveMessageResult, err := fakeSQSClient.ReceiveMessage(ctx, &sqs.ReceiveMessageInput{
+		receiveMessageResult, err := inMemorySQSClient.ReceiveMessage(ctx, &sqs.ReceiveMessageInput{
 			QueueUrl:            getQueueURLResult.QueueUrl,
 			MaxNumberOfMessages: 1,
 			VisibilityTimeout:   3,
@@ -81,25 +81,25 @@ func TestFakeSQSClient(t *testing.T) {
 	}()
 	wg.Wait()
 	require.NotEmpty(t, receiptHandle, "should have receipt handle")
-	_, err = fakeSQSClient.DeleteMessage(ctx, &sqs.DeleteMessageInput{
+	_, err = inMemorySQSClient.DeleteMessage(ctx, &sqs.DeleteMessageInput{
 		QueueUrl:      getQueueURLResult.QueueUrl,
 		ReceiptHandle: &receiptHandle,
 	})
 	require.NoError(t, err, "should delete message")
 }
 
-func TestSQSLongPollingService__WithFakeSQS(t *testing.T) {
+func TestSQSLongPollingService__WithinMemorySQS(t *testing.T) {
 	var logs bytes.Buffer
 	t.Cleanup(func() {
 		t.Log("Logs\n", logs.String())
 	})
 	logger := slog.New(slog.NewJSONHandler(&logs, &slog.HandlerOptions{Level: slog.LevelDebug}))
-	fakeSQSClient := &fakeSQSClient{
+	inMemorySQSClient := &inMemorySQSClient{
 		visibilityTimeout: time.Second,
 		logger:            logger,
 	}
 	svc := &sqsLongPollingService{
-		sqsClient:           fakeSQSClient,
+		sqsClient:           inMemorySQSClient,
 		logger:              logger,
 		queueURL:            "https://sqs.ap-northeast-1.amazonaws.com/123456789012/test-queue",
 		maxDeleteRetry:      3,
@@ -127,13 +127,13 @@ func TestSQSLongPollingService__WithFakeSQS(t *testing.T) {
 		})
 		require.ErrorIs(t, err, context.Canceled, "should be canceled")
 	}()
-	output, err := fakeSQSClient.SendMessage(ctx, input)
+	output, err := inMemorySQSClient.SendMessage(ctx, input)
 	require.NoError(t, err, "should send message")
 	msg := <-receivedMessages
 	require.Equal(t, *output.MessageId, msg.MessageId, "should receive message")
 	cancel()
 	wg.Wait()
-	require.Equal(t, 0, len(fakeSQSClient.messages), "should have no message in fake sqs client")
+	require.Equal(t, 0, len(inMemorySQSClient.messages), "should have no message in fake sqs client")
 }
 
 func TestSQSLongPollingService__WithAWS(t *testing.T) {

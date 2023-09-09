@@ -10,6 +10,7 @@ import (
 	"mime"
 	"net/http"
 	"net/url"
+	"os"
 	"strings"
 	"time"
 
@@ -220,4 +221,8 @@ func parseURL(urlStr string) (*url.URL, error) {
 		}
 	}
 	return u, nil
+}
+
+func isLambda() bool {
+	return strings.HasPrefix(os.Getenv("AWS_EXECUTION_ENV"), "AWS_Lambda") || os.Getenv("AWS_LAMBDA_RUNTIME_API") != ""
 }

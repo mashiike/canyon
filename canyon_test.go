@@ -80,7 +80,7 @@ func TestServerHandler(t *testing.T) {
 	})
 	c := defaultRunConfig(nil, "test-queue")
 	c.logger = slog.New(slog.NewJSONHandler(&logs, &slog.HandlerOptions{Level: slog.LevelDebug}))
-	sqsClient := &fakeSQSClient{
+	sqsClient := &inMemorySQSClient{
 		visibilityTimeout: 30 * time.Second,
 		logger:            c.logger,
 	}
