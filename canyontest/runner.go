@@ -3,6 +3,7 @@ package canyontest
 import (
 	"context"
 	"fmt"
+	"io"
 	"net"
 	"net/http"
 	"os"
@@ -15,6 +16,7 @@ import (
 type Runner struct {
 	URL      string // base URL of form http://ipaddr:port with no trailing slash
 	Listener net.Listener
+	Stdin    io.Writer
 
 	closed   bool
 	cancel   context.CancelCauseFunc
@@ -32,9 +34,11 @@ func NewRunner(mux http.Handler, _opts ...canyon.Option) *Runner {
 	if err != nil {
 		panic(fmt.Sprintf("split host port failed: %s", err))
 	}
+	pr, pw := io.Pipe()
 	r := &Runner{
 		URL:      fmt.Sprintf("http://127.0.0.1:%s", port),
 		Listener: listener,
+		Stdin:    pw,
 		cancel:   cancel,
 	}
 	opts := []canyon.Option{
@@ -45,6 +49,7 @@ func NewRunner(mux http.Handler, _opts ...canyon.Option) *Runner {
 			os.Stdout,      // if exceed max receive count, message will be sent to stdout as json
 		),
 		canyon.WithBackend(canyon.NewInMemoryBackend()),
+		canyon.WithStdin(pr),
 	}
 	if len(_opts) > 0 {
 		opts = append(opts, _opts...)
