@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"io"
 	"log/slog"
@@ -21,7 +22,7 @@ func main() {
 	opts := []canyon.Option{
 		canyon.WithServerAddress(":8080", "/"),
 		canyon.WithCanyonEnv("CANYON_"), // environment variables prefix
-		canyon.WithLambdaFallbackHandler(func(ctx context.Context, event []byte) error {
+		canyon.WithLambdaFallbackHandler(func(ctx context.Context, event json.RawMessage) error {
 			slog.Error("non SQS or HTTP event", "event", string(event))
 			return errors.New("invalid lambda payload")
 		}),
