@@ -1,5 +1,9 @@
 # Changelog
 
+## [v0.3.0](https://github.com/mashiike/canyon/compare/v0.2.0...v0.3.0) - 2023-09-09
+- fix misc by @mashiike in https://github.com/mashiike/canyon/pull/11
+- Lambda Fallback Handler  by @mashiike in https://github.com/mashiike/canyon/pull/14
+
 ## [v0.2.0](https://github.com/mashiike/canyon/compare/v0.1.0...v0.2.0) - 2023-09-08
 - rename SendToSQS => SendToWorker by @mashiike in https://github.com/mashiike/canyon/pull/6
 - s3 backend by @mashiike in https://github.com/mashiike/canyon/pull/8
