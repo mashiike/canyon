@@ -211,7 +211,7 @@ func runWithContext(ctx context.Context, mux http.Handler, c *runOptions) error 
 						errors.As(err, &jsonUnmarshalTypeError),
 						errors.As(err, &jsonSyntaxError):
 						c.WarnContextWhenVarbose(cctx, "failed to decode event from stdin, reset decoder state", "error", err)
-						decoder.Reset()
+						decoder.SkipUntilValidToken()
 						continue
 					default:
 						c.DebugContextWhenVarbose(cctx, "stop fallback lambda handler", "error", err, "type", fmt.Sprintf("%T", err))

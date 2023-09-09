@@ -13,10 +13,26 @@ import (
 	"github.com/mashiike/canyon"
 )
 
+type dummyStdin struct {
+	*io.PipeWriter
+	mu          sync.Mutex
+	stdinClosed bool
+}
+
+func (d *dummyStdin) Close() error {
+	d.mu.Lock()
+	defer d.mu.Unlock()
+	if d.stdinClosed {
+		return nil
+	}
+	d.stdinClosed = true
+	return d.PipeWriter.Close()
+}
+
 type Runner struct {
 	URL      string // base URL of form http://ipaddr:port with no trailing slash
 	Listener net.Listener
-	Stdin    io.Writer
+	Stdin    io.WriteCloser
 
 	closed   bool
 	cancel   context.CancelCauseFunc
@@ -38,8 +54,10 @@ func NewRunner(mux http.Handler, _opts ...canyon.Option) *Runner {
 	r := &Runner{
 		URL:      fmt.Sprintf("http://127.0.0.1:%s", port),
 		Listener: listener,
-		Stdin:    pw,
-		cancel:   cancel,
+		Stdin: &dummyStdin{
+			PipeWriter: pw,
+		},
+		cancel: cancel,
 	}
 	opts := []canyon.Option{
 		canyon.WithListener(listener),
@@ -73,6 +91,7 @@ func (r *Runner) Close() error {
 	}
 	r.closed = true
 	r.Listener.Close()
+	r.Stdin.Close()
 	r.wg.Wait()
 	return nil
 }

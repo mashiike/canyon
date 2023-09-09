@@ -1,6 +1,7 @@
 package jsonx
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"io"
@@ -65,8 +66,28 @@ func (d *Decoder) MoreWithContext(ctx context.Context) bool {
 	}
 }
 
-func (d *Decoder) Reset() {
+func (d *Decoder) SkipUntilValidToken() error {
 	d.mu.Lock()
 	defer d.mu.Unlock()
-	d.Decoder = *json.NewDecoder(d.r)
+	bs, err := io.ReadAll(d.Decoder.Buffered())
+	if err != nil {
+		return err
+	}
+	for d.Decoder.InputOffset() == 0 {
+		if len(bs) == 0 {
+			d.Decoder = *json.NewDecoder(d.r)
+			return nil
+		}
+		d.Decoder = *json.NewDecoder(bytes.NewReader(bs[1:]))
+		_, err = d.Decoder.Token()
+		if err == nil {
+			break
+		}
+		bs, err = io.ReadAll(d.Decoder.Buffered())
+		if err != nil {
+			return err
+		}
+	}
+	d.Decoder = *json.NewDecoder(io.MultiReader(bytes.NewReader(bs[1:]), d.r))
+	return nil
 }

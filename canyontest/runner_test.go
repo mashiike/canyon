@@ -33,6 +33,7 @@ func TestRunner(t *testing.T) {
 		}),
 		canyon.WithVarbose(),
 		canyon.WithLambdaFallbackHandler(func(ctx context.Context, event json.RawMessage) error {
+			slog.Info("fallback", slog.String("event", string(event)))
 			fallbackJSONCh <- event
 			return nil
 		}),
