@@ -13,6 +13,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/aws/aws-lambda-go/lambda"
 	"github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/service/sqs"
 )
@@ -61,6 +62,39 @@ type runOptions struct {
 	disableWorker                  bool
 	disableServer                  bool
 	cleanupFuncs                   []func()
+	lambdaFallbackHandler          lambda.Handler
+	stdin                          io.Reader
+}
+
+func defaultRunConfig(cancel context.CancelCauseFunc, sqsQueueName string) *runOptions {
+	c := &runOptions{
+		batchSize:                      1,
+		address:                        ":8080",
+		prefix:                         "/",
+		logger:                         slog.Default(),
+		proxyProtocol:                  false,
+		sqsQueueName:                   sqsQueueName,
+		fakeSQSClientDLQ:               io.Discard,
+		fakeSQSClientMaxReceiveCount:   3,
+		fakeSQSClientVisibilityTimeout: 30 * time.Second,
+		pollingDuration:                20 * time.Second,
+		logVarbose:                     false,
+		responseChecker:                DefaultWorkerResponseChecker,
+		disableWorker:                  false,
+		disableServer:                  false,
+		cleanupFuncs:                   []func(){},
+		lambdaFallbackHandler:          nil,
+		stdin:                          os.Stdin,
+	}
+	if cancel != nil {
+		c.cancel = cancel
+	} else {
+		c.cancel = func(error) {}
+	}
+	if u, err := url.Parse(sqsQueueName); err == nil && u.Scheme != "" {
+		c.sqsQueueURL = u.String()
+	}
+	return c
 }
 
 func (c *runOptions) SQSClientAndQueueURL() (string, SQSClient) {
@@ -115,6 +149,12 @@ func (c *runOptions) InfoContextWhenVarbose(ctx context.Context, msg string, key
 	}
 }
 
+func (c *runOptions) WarnContextWhenVarbose(ctx context.Context, msg string, keysAndValues ...interface{}) {
+	if c.logVarbose {
+		c.logger.WarnContext(ctx, msg, keysAndValues...)
+	}
+}
+
 func (c *runOptions) Cleanup() {
 	c.mu.Lock()
 	defer c.mu.Unlock()
@@ -125,32 +165,6 @@ func (c *runOptions) Cleanup() {
 
 // Option is a Run() and RunWtihContext() option.
 type Option func(*runOptions)
-
-func defaultRunConfig(cancel context.CancelCauseFunc, sqsQueueName string) *runOptions {
-	c := &runOptions{
-		batchSize:                      1,
-		address:                        ":8080",
-		prefix:                         "/",
-		logger:                         slog.Default(),
-		proxyProtocol:                  false,
-		sqsQueueName:                   sqsQueueName,
-		fakeSQSClientDLQ:               io.Discard,
-		fakeSQSClientMaxReceiveCount:   3,
-		fakeSQSClientVisibilityTimeout: 30 * time.Second,
-		pollingDuration:                20 * time.Second,
-		logVarbose:                     false,
-		responseChecker:                DefaultWorkerResponseChecker,
-	}
-	if cancel != nil {
-		c.cancel = cancel
-	} else {
-		c.cancel = func(error) {}
-	}
-	if u, err := url.Parse(sqsQueueName); err == nil && u.Scheme != "" {
-		c.sqsQueueURL = u.String()
-	}
-	return c
-}
 
 // WithContext returns a new Option that sets the local server listener.
 // this option for testing. normally, you should not use this option.
@@ -353,5 +367,22 @@ func WithCanyonEnv(envPrefix string) Option {
 			}
 		}
 		c.logger.Info("running canyon", "env", env)
+	}
+}
+
+// WithLambdaFallbackHandler returns a new Option that sets the fallback lambda handler.
+// if set this option, call fallback lambda handler when paylaod is not sqs message or http request.
+func WithLambdaFallbackHandler(handler interface{}) Option {
+	return func(c *runOptions) {
+		c.lambdaFallbackHandler = lambda.NewHandler(handler)
+	}
+}
+
+// WithStdin returns a new Option that sets the Stdin Stream reader.
+// this option for testing. normally, you should not use this option.
+// to fallback lambda handler test.
+func WithStdin(stdin io.Reader) Option {
+	return func(c *runOptions) {
+		c.stdin = stdin
 	}
 }
