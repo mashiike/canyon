@@ -68,6 +68,12 @@ data "aws_iam_policy_document" "canyon_example" {
     ]
   }
   statement {
+    resources = ["*"]
+    actions = [
+      "lambda:ListEventSourceMappings",
+    ]
+  }
+  statement {
     actions = [
       "logs:GetLog*",
       "logs:CreateLogGroup",
@@ -130,12 +136,13 @@ resource "aws_lambda_function_url" "canyon_example" {
 }
 
 resource "aws_lambda_event_source_mapping" "canyon_example" {
-  batch_size       = 10
-  event_source_arn = aws_sqs_queue.canyon_example.arn
-  enabled          = true
-  function_name    = aws_lambda_alias.canyon_example.arn
+  batch_size                         = 10
+  event_source_arn                   = aws_sqs_queue.canyon_example.arn
+  enabled                            = true
+  maximum_batching_window_in_seconds = 5
+  function_name                      = aws_lambda_alias.canyon_example.arn
+  function_response_types            = ["ReportBatchItemFailures"]
 }
-
 
 output "lambda_function_url" {
   description = "Generated function URL"

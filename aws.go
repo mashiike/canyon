@@ -23,6 +23,8 @@ import (
 	"github.com/aws/aws-sdk-go-v2/aws/arn"
 	"github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/feature/s3/manager"
+	sdklambda "github.com/aws/aws-sdk-go-v2/service/lambda"
+	lambdatypes "github.com/aws/aws-sdk-go-v2/service/lambda/types"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 	"github.com/aws/aws-sdk-go-v2/service/sqs"
 	"github.com/aws/aws-sdk-go-v2/service/sqs/types"
@@ -582,4 +584,57 @@ func (b *S3Backend) LoadRequestBody(ctx context.Context, u *url.URL) (io.ReadClo
 	}
 	objectBody := buf.Bytes()[:head.ContentLength]
 	return io.NopCloser(bytes.NewReader(objectBody)), nil
+}
+
+var (
+	enableReportBatchItemFailures  map[string]bool = make(map[string]bool)
+	onceCheckFunctionResponseTypes sync.Once
+)
+
+func checkFunctionResponseTypes(ctx context.Context, c *runOptions) {
+	defer func() {
+		for k, v := range enableReportBatchItemFailures {
+			if v {
+				c.InfoContextWhenVarbose(ctx, "enable report batch item failures", "event_source_arn", k)
+			}
+		}
+	}()
+
+	awsCfg, err := config.LoadDefaultConfig(ctx)
+	if err != nil {
+		return
+	}
+	lambdaClient := sdklambda.NewFromConfig(awsCfg)
+	lc, ok := lambdacontext.FromContext(ctx)
+	if !ok {
+		c.WarnContextWhenVarbose(ctx, "missing lambda context for check function response types")
+		return
+	}
+	p := sdklambda.NewListEventSourceMappingsPaginator(lambdaClient, &sdklambda.ListEventSourceMappingsInput{
+		FunctionName: &lc.InvokedFunctionArn,
+	})
+	for p.HasMorePages() {
+		list, err := p.NextPage(ctx)
+		if err != nil {
+			c.WarnContextWhenVarbose(ctx, "failed to list event source mappings", "error", err)
+			return
+		}
+		for _, m := range list.EventSourceMappings {
+			if m.EventSourceArn == nil {
+				continue
+			}
+			if !strings.HasPrefix(*m.EventSourceArn, "arn:aws:sqs:") {
+				continue
+			}
+			for _, v := range m.FunctionResponseTypes {
+				if v == lambdatypes.FunctionResponseTypeReportBatchItemFailures {
+					enableReportBatchItemFailures[*m.EventSourceArn] = true
+				}
+			}
+		}
+	}
+}
+
+func isEnableReportBatchItemFailures(ctx context.Context, eventSourceARN string) bool {
+	return enableReportBatchItemFailures[eventSourceARN]
 }

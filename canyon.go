@@ -72,7 +72,25 @@ func runWithContext(ctx context.Context, mux http.Handler, c *runOptions) error 
 					return nil, err
 				}
 				if p.IsSQSEvent && !c.disableWorker {
-					return workerHandler(ctx, p.SQSEvent)
+					if len(p.SQSEvent.Records) > 1 {
+						onceCheckFunctionResponseTypes.Do(func() {
+							checkFunctionResponseTypes(ctx, c)
+						})
+					}
+					resp, err := workerHandler(ctx, p.SQSEvent)
+					if err != nil {
+						return nil, err
+					}
+					if len(resp.BatchItemFailures) == 0 {
+						return resp, nil
+					}
+					if len(p.SQSEvent.Records) == 1 {
+						return resp, fmt.Errorf("failed processing record(message_id=%s)", p.SQSEvent.Records[0].MessageId)
+					}
+					if !isEnableReportBatchItemFailures(ctx, p.SQSEvent.Records[0].EventSourceARN) {
+						return resp, fmt.Errorf("failed processing %d records", len(resp.BatchItemFailures))
+					}
+					return resp, nil
 				}
 				if p.IsHTTPEvent && !c.disableServer {
 					r := p.Request.WithContext(ctx)
