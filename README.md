@@ -165,6 +165,95 @@ and `canyon.IsWorker(r) == true` request, request body will be download from Bac
 `canyon.NewS3Backend("s3://bucket-name/prefix")` returns `canyon.S3Backend` instance.
 this instance is implementation of `canyon.Backend` interface with AWS S3. 
 
+### Envoiroment switch option `canyon.WithCanyonEnv(envPrefix)`
+
+`canyon.WithCanyonEnv(envPrefix)` option is helper option for environment switch.
+this options is flexible option. for example, case of envPrefix is `CANYON_` below.
+
+if `CAYNON_ENV=development`, return multiple options (`canyon.WithInMemoryQueue()` and `canyon.WithFileBackend()`, `canyon.WithVerbose()`).
+file backend setup temporary directory.
+
+if `CANYON_ENV=test`,  return multiple options (`canyon.WithInMemoryQueue()` and `canyon.WithInMemoryBackend()`).
+
+other value, same as `CANYON_ENV=production`.
+in production mode, enable `CAYNON_BACKEND_URL`.
+this environment variable is backend url. for example `s3://bucket-name/prefix`, setup `canyon.NewS3Backend("s3://bucket-name/prefix")` and `canyon.WithBackend(...)` options.
+and if `CANYON_BACKEND_SAVE_APP_NAME` is set, set `canyon.S3Backend.SetAppName(...)`
+
+if backend url is `file:///tmp/canyon`, setup `canyon.NewFileBackend("/tmp/canyon")` and `canyon.WithBackend(...)` options.
+
+for example default usage is
+
+```go
+package main
+
+//...
+
+func main() {
+//...
+    opts := []canyon.Option{
+        canyon.WithServerAddress(":8080", "/"),
+        canyon.WithCanyonEnv("CANYON_"),
+    }
+    err := canyon.RunWithContext(ctx, "your-sqs-queue-name", http.HandlerFunc(handler), opts...)
+    if err != nil {
+        slog.Error("failed to run canyon", "error", err)
+        os.Exit(1)
+    }
+}
+```
+set to last of options.
+
+```shell
+$ CANYON_ENV=development go run main.go
+```
+work as local development mode. using in memory queue and temporary file backend.
+
+```shell
+$ CANYON_ENV=production go run main.go
+```
+work as production mode. using AWS SQS and AWS S3.
+
+
+### Lambda Fallback Handler `canyon.WithLambdaFallbackHandler(handler)`
+
+`canyon.WithLambdaFallbackHandler(handler)` option is helper option for fallback handler.
+if lambda payload is not SQS Event, call handler, call this handler.
+
+```go
+package main
+
+//...
+
+func main() {
+//...
+    opts := []canyon.Option{
+        canyon.WithServerAddress(":8080", "/"),
+        canyon.WithLambdaFallbackHandler(func(ctx context.Context, event json.RawMessage) (interface{}, error) {
+            // your fallback handler code
+            // call if lambda payload is not SQS Event or HTTP Event
+            fmt.Println("fallback handler called:", string(event))
+            return nil, nil
+        }),
+    }
+    err := canyon.RunWithContext(ctx, "your-sqs-queue-name", http.HandlerFunc(handler), opts...)
+    if err != nil {
+        slog.Error("failed to run canyon", "error", err)
+        os.Exit(1)
+    }
+}
+```
+
+on local development, if set lambda callback handler, parse os.Stdin as lambda payload and call handler.
+
+```shell
+$ echo '{"foo":"bar"}' | go run main.go
+<... few lines ...>
+fallback handler called: {"foo":"bar"}
+<... continue program ...>
+```
+
+
 ## For testing  
 
 `caynontest` package is helper package for testing.
@@ -222,57 +311,6 @@ func TestWorkerLogic(t *testing.T) {
     // your test code
 }
 ```
-
-## Envoiroment switch option `canyon.WithCanyonEnv(envPrefix)`
-
-`canyon.WithCanyonEnv(envPrefix)` option is helper option for environment switch.
-this options is flexible option. for example, case of envPrefix is `CANYON_` below.
-
-if `CAYNON_ENV=development`, return multiple options (`canyon.WithInMemoryQueue()` and `canyon.WithFileBackend()`, `canyon.WithVerbose()`).
-file backend setup temporary directory.
-
-if `CANYON_ENV=test`,  return multiple options (`canyon.WithInMemoryQueue()` and `canyon.WithInMemoryBackend()`).
-
-other value, same as `CANYON_ENV=production`.
-in production mode, enable `CAYNON_BACKEND_URL`.
-this environment variable is backend url. for example `s3://bucket-name/prefix`, setup `canyon.NewS3Backend("s3://bucket-name/prefix")` and `canyon.WithBackend(...)` options.
-and if `CANYON_BACKEND_SAVE_APP_NAME` is set, set `canyon.S3Backend.SetAppName(...)`
-
-if backend url is `file:///tmp/canyon`, setup `canyon.NewFileBackend("/tmp/canyon")` and `canyon.WithBackend(...)` options.
-
-for example default usage is
-
-```go
-package main
-
-//...
-
-func main() {
-//...
-    opts := []canyon.Option{
-        canyon.WithServerAddress(":8080", "/"),
-        canyon.WithCanyonEnv("CANYON_"),
-    }
-    err := canyon.RunWithContext(ctx, "your-sqs-queue-name", http.HandlerFunc(handler), opts...)
-    if err != nil {
-        slog.Error("failed to run canyon", "error", err)
-        os.Exit(1)
-    }
-}
-```
-set to last of options.
-
-```shell
-$ CANYON_ENV=development go run main.go
-```
-work as local development mode. using in memory queue and temporary file backend.
-
-```shell
-$ CANYON_ENV=production go run main.go
-```
-work as production mode. using AWS SQS and AWS S3.
-
-
 ## LICENSE
 
 MIT

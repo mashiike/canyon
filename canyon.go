@@ -20,6 +20,7 @@ import (
 	"github.com/aws/aws-lambda-go/lambda"
 	"github.com/aws/aws-sdk-go-v2/service/sqs/types"
 	"github.com/fujiwara/ridge"
+	"github.com/mashiike/canyon/internal/jsonx"
 	"github.com/pires/go-proxyproto"
 )
 
@@ -78,6 +79,9 @@ func runWithContext(ctx context.Context, mux http.Handler, c *runOptions) error 
 					w := ridge.NewResponseWriter()
 					serverHandler.ServeHTTP(w, r)
 					return w.Response(), nil
+				}
+				if c.lambdaFallbackHandler != nil {
+					return c.lambdaFallbackHandler.Invoke(ctx, event)
 				}
 				return nil, errors.New("unsupported event")
 			},
@@ -155,8 +159,8 @@ func runWithContext(ctx context.Context, mux http.Handler, c *runOptions) error 
 		}()
 	}
 	if !c.disableWorker {
+		wg.Add(1)
 		go func() {
-			wg.Add(1)
 			defer func() {
 				c.logger.InfoContext(cctx, "shutting down sqs poller", "queue", c.sqsQueueName)
 				wg.Done()
@@ -179,6 +183,55 @@ func runWithContext(ctx context.Context, mux http.Handler, c *runOptions) error 
 				errs = append(errs, err)
 				mu.Unlock()
 				cancel()
+			}
+		}()
+	}
+	if c.lambdaFallbackHandler != nil {
+		wg.Add(1)
+		go func() {
+			defer func() {
+				c.logger.InfoContext(cctx, "shutting down fallback lambda handler")
+				wg.Done()
+			}()
+			c.logger.InfoContext(cctx, "staring fallback lambda handler, bypassing from stdin")
+			decoder := jsonx.NewDecoder(c.stdin)
+			for decoder.MoreWithContext(ctx) {
+				var event json.RawMessage
+				if err := decoder.DecodeWithContext(ctx, &event); err != nil {
+					var jsonUnmarshalTypeError *json.UnmarshalTypeError
+					var jsonSyntaxError *json.SyntaxError
+					switch {
+					case errors.Is(err, io.EOF),
+						errors.Is(err, context.Canceled),
+						errors.Is(err, context.DeadlineExceeded),
+						errors.Is(err, io.ErrClosedPipe),
+						errors.Is(err, io.ErrUnexpectedEOF):
+						break
+					case
+						errors.As(err, &jsonUnmarshalTypeError),
+						errors.As(err, &jsonSyntaxError):
+						c.WarnContextWhenVarbose(cctx, "failed to decode event from stdin, reset decoder state", "error", err)
+						decoder.SkipUntilValidToken()
+						continue
+					default:
+						c.DebugContextWhenVarbose(cctx, "stop fallback lambda handler", "error", err, "type", fmt.Sprintf("%T", err))
+						mu.Lock()
+						errs = append(errs, err)
+						mu.Unlock()
+					}
+					cancel()
+					return
+				}
+				if _, err := c.lambdaFallbackHandler.Invoke(cctx, event); err != nil {
+					if !errors.Is(err, context.Canceled) && !errors.Is(err, context.DeadlineExceeded) {
+						c.DebugContextWhenVarbose(cctx, "failed to invoke fallback lambda handler", "error", err)
+						mu.Lock()
+						errs = append(errs, err)
+						mu.Unlock()
+						cancel()
+					}
+					return
+				}
 			}
 		}()
 	}

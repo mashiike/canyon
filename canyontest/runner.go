@@ -3,6 +3,7 @@ package canyontest
 import (
 	"context"
 	"fmt"
+	"io"
 	"net"
 	"net/http"
 	"os"
@@ -12,9 +13,26 @@ import (
 	"github.com/mashiike/canyon"
 )
 
+type dummyStdin struct {
+	*io.PipeWriter
+	mu          sync.Mutex
+	stdinClosed bool
+}
+
+func (d *dummyStdin) Close() error {
+	d.mu.Lock()
+	defer d.mu.Unlock()
+	if d.stdinClosed {
+		return nil
+	}
+	d.stdinClosed = true
+	return d.PipeWriter.Close()
+}
+
 type Runner struct {
 	URL      string // base URL of form http://ipaddr:port with no trailing slash
 	Listener net.Listener
+	Stdin    io.WriteCloser
 
 	closed   bool
 	cancel   context.CancelCauseFunc
@@ -32,10 +50,14 @@ func NewRunner(mux http.Handler, _opts ...canyon.Option) *Runner {
 	if err != nil {
 		panic(fmt.Sprintf("split host port failed: %s", err))
 	}
+	pr, pw := io.Pipe()
 	r := &Runner{
 		URL:      fmt.Sprintf("http://127.0.0.1:%s", port),
 		Listener: listener,
-		cancel:   cancel,
+		Stdin: &dummyStdin{
+			PipeWriter: pw,
+		},
+		cancel: cancel,
 	}
 	opts := []canyon.Option{
 		canyon.WithListener(listener),
@@ -45,6 +67,7 @@ func NewRunner(mux http.Handler, _opts ...canyon.Option) *Runner {
 			os.Stdout,      // if exceed max receive count, message will be sent to stdout as json
 		),
 		canyon.WithBackend(canyon.NewInMemoryBackend()),
+		canyon.WithStdin(pr),
 	}
 	if len(_opts) > 0 {
 		opts = append(opts, _opts...)
@@ -68,6 +91,7 @@ func (r *Runner) Close() error {
 	}
 	r.closed = true
 	r.Listener.Close()
+	r.Stdin.Close()
 	r.wg.Wait()
 	return nil
 }
