@@ -1,5 +1,9 @@
 # Changelog
 
+## [v0.3.1](https://github.com/mashiike/canyon/compare/v0.3.0...v0.3.1) - 2023-09-09
+- fix Lambda fallback  by @mashiike in https://github.com/mashiike/canyon/pull/15
+- on Lambda Runtime: if use in memory queue,sync processing by @mashiike in https://github.com/mashiike/canyon/pull/17
+
 ## [v0.3.0](https://github.com/mashiike/canyon/compare/v0.2.0...v0.3.0) - 2023-09-09
 - fix misc by @mashiike in https://github.com/mashiike/canyon/pull/11
 - Lambda Fallback Handler  by @mashiike in https://github.com/mashiike/canyon/pull/14
