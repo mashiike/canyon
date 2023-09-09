@@ -23,7 +23,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestinMemorySQSClient(t *testing.T) {
+func TestInMemorySQSClient(t *testing.T) {
 	var logs bytes.Buffer
 	t.Cleanup(func() {
 		t.Log("Logs\n", logs.String())
