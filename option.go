@@ -41,50 +41,50 @@ var DefaultWorkerResponseChecker = WorkerResponseCheckerFunc(func(ctx context.Co
 type runOptions struct {
 	mu sync.Mutex
 
-	cancel                         context.CancelCauseFunc
-	address                        string
-	prefix                         string
-	batchSize                      int
-	logger                         *slog.Logger
-	proxyProtocol                  bool
-	sqsClient                      SQSClient
-	backend                        Backend
-	sqsQueueName                   string
-	sqsQueueURL                    string
-	useFakeSQSRunOnLocal           bool
-	fakeSQSClientDLQ               io.Writer
-	fakeSQSClientMaxReceiveCount   int32
-	fakeSQSClientVisibilityTimeout time.Duration
-	pollingDuration                time.Duration
-	listener                       net.Listener
-	logVarbose                     bool
-	responseChecker                WorkerResponseChecker
-	disableWorker                  bool
-	disableServer                  bool
-	cleanupFuncs                   []func()
-	lambdaFallbackHandler          lambda.Handler
-	stdin                          io.Reader
+	cancel                             context.CancelCauseFunc
+	address                            string
+	prefix                             string
+	batchSize                          int
+	logger                             *slog.Logger
+	proxyProtocol                      bool
+	sqsClient                          SQSClient
+	backend                            Backend
+	sqsQueueName                       string
+	sqsQueueURL                        string
+	useInMemorySQS                     bool
+	inMemorySQSClientDLQ               io.Writer
+	inMemorySQSClientMaxReceiveCount   int32
+	inMemorySQSClientVisibilityTimeout time.Duration
+	pollingDuration                    time.Duration
+	listener                           net.Listener
+	logVarbose                         bool
+	responseChecker                    WorkerResponseChecker
+	disableWorker                      bool
+	disableServer                      bool
+	cleanupFuncs                       []func()
+	lambdaFallbackHandler              lambda.Handler
+	stdin                              io.Reader
 }
 
 func defaultRunConfig(cancel context.CancelCauseFunc, sqsQueueName string) *runOptions {
 	c := &runOptions{
-		batchSize:                      1,
-		address:                        ":8080",
-		prefix:                         "/",
-		logger:                         slog.Default(),
-		proxyProtocol:                  false,
-		sqsQueueName:                   sqsQueueName,
-		fakeSQSClientDLQ:               io.Discard,
-		fakeSQSClientMaxReceiveCount:   3,
-		fakeSQSClientVisibilityTimeout: 30 * time.Second,
-		pollingDuration:                20 * time.Second,
-		logVarbose:                     false,
-		responseChecker:                DefaultWorkerResponseChecker,
-		disableWorker:                  false,
-		disableServer:                  false,
-		cleanupFuncs:                   []func(){},
-		lambdaFallbackHandler:          nil,
-		stdin:                          os.Stdin,
+		batchSize:                          1,
+		address:                            ":8080",
+		prefix:                             "/",
+		logger:                             slog.Default(),
+		proxyProtocol:                      false,
+		sqsQueueName:                       sqsQueueName,
+		inMemorySQSClientDLQ:               io.Discard,
+		inMemorySQSClientMaxReceiveCount:   3,
+		inMemorySQSClientVisibilityTimeout: 30 * time.Second,
+		pollingDuration:                    20 * time.Second,
+		logVarbose:                         false,
+		responseChecker:                    DefaultWorkerResponseChecker,
+		disableWorker:                      false,
+		disableServer:                      false,
+		cleanupFuncs:                       []func(){},
+		lambdaFallbackHandler:              nil,
+		stdin:                              os.Stdin,
 	}
 	if cancel != nil {
 		c.cancel = cancel
@@ -229,7 +229,7 @@ func WithProxyProtocol() Option {
 func WithSQSClient(sqsClient SQSClient) Option {
 	return func(c *runOptions) {
 		c.sqsClient = sqsClient
-		c.useFakeSQSRunOnLocal = false
+		c.useInMemorySQS = false
 	}
 }
 
@@ -249,9 +249,9 @@ func WithVarbose() Option {
 // for local development.
 func WithInMemoryQueue(visibilityTimeout time.Duration, maxReceiveCount int64, dlq io.Writer) Option {
 	return func(c *runOptions) {
-		c.useFakeSQSRunOnLocal = true
+		c.useInMemorySQS = true
 		if dlq == nil {
-			c.fakeSQSClientDLQ = io.Discard
+			c.inMemorySQSClientDLQ = io.Discard
 		}
 	}
 }

@@ -9,7 +9,6 @@ import (
 	"io"
 	"net"
 	"net/http"
-	"os"
 	"strings"
 	"sync"
 	"time"
@@ -64,7 +63,7 @@ func RunWithContext(ctx context.Context, sqsQueueName string, mux http.Handler, 
 func runWithContext(ctx context.Context, mux http.Handler, c *runOptions) error {
 	workerHandler := newWorkerHandler(mux, c)
 	serverHandler := newServerHandler(mux, c)
-	if strings.HasPrefix(os.Getenv("AWS_EXECUTION_ENV"), "AWS_Lambda") || os.Getenv("AWS_LAMBDA_RUNTIME_API") != "" {
+	if isLambda() {
 		lambda.StartWithOptions(
 			func(ctx context.Context, event json.RawMessage) (interface{}, error) {
 				var p eventPayload
@@ -110,12 +109,12 @@ func runWithContext(ctx context.Context, mux http.Handler, c *runOptions) error 
 		)
 		return nil
 	}
-	if c.useFakeSQSRunOnLocal {
-		c.logger.Info("enable in memory queue", "visibility_timeout", c.fakeSQSClientVisibilityTimeout.String(), "max_receive_count", c.fakeSQSClientMaxReceiveCount)
-		fakeClient := &fakeSQSClient{
-			visibilityTimeout: c.fakeSQSClientVisibilityTimeout,
-			maxReceiveCount:   int(c.fakeSQSClientMaxReceiveCount),
-			dlq:               json.NewEncoder(c.fakeSQSClientDLQ),
+	if c.useInMemorySQS {
+		c.logger.Info("enable in memory queue", "visibility_timeout", c.inMemorySQSClientVisibilityTimeout.String(), "max_receive_count", c.inMemorySQSClientMaxReceiveCount)
+		fakeClient := &inMemorySQSClient{
+			visibilityTimeout: c.inMemorySQSClientVisibilityTimeout,
+			maxReceiveCount:   int(c.inMemorySQSClientMaxReceiveCount),
+			dlq:               json.NewEncoder(c.inMemorySQSClientDLQ),
 		}
 		if c.logVarbose {
 			fakeClient.logger = c.logger.With(LogComponentAttributeKey, "fake_sqs")
@@ -187,7 +186,7 @@ func runWithContext(ctx context.Context, mux http.Handler, c *runOptions) error 
 				wg.Done()
 			}()
 			queueURL, client := c.SQSClientAndQueueURL()
-			c.logger.InfoContext(cctx, "staring polling sqs queue", "queue", c.sqsQueueName, "on_memory_queue_mode", c.useFakeSQSRunOnLocal)
+			c.logger.InfoContext(cctx, "staring polling sqs queue", "queue", c.sqsQueueName, "on_memory_queue_mode", c.useInMemorySQS)
 			poller := &sqsLongPollingService{
 				sqsClient:           client,
 				queueURL:            queueURL,
@@ -374,31 +373,47 @@ func newServerHandler(mux http.Handler, c *runOptions) http.Handler {
 	if c.logVarbose {
 		serializer.SetLogger(logger)
 	}
+	var sender SQSMessageSender
+	if isLambda() && c.useInMemorySQS {
+		sender = SQSMessageSenderFunc(func(r *http.Request, m MessageAttributes) (string, error) {
+			// recoall mux as worker
+			ctx := EmbedIsWorkerInContext(r.Context(), true)
+			w := NewWorkerResponseWriter()
+			mux.ServeHTTP(w, r.WithContext(ctx))
+			workerResp := w.Response(r)
+			if c.responseChecker.IsFailure(ctx, workerResp) {
+				return "", fmt.Errorf("failed similated worker handler: status_code=%d", w.statusCode)
+			}
+			return "in-memory-message", nil
+		})
+	} else {
+		sender = SQSMessageSenderFunc(func(r *http.Request, m MessageAttributes) (string, error) {
+			queueURL, client := c.SQSClientAndQueueURL()
+			l := Logger(r)
+			if c.logVarbose {
+				l.DebugContext(r.Context(), "try sqs send message with http request", "method", r.Method, "path", r.URL.Path)
+			}
+			ctx := r.Context()
+			ctx = embedLoggerInContext(ctx, logger)
+			input, err := serializer.NewSendMessageInput(ctx, queueURL, r, m)
+			if err != nil {
+				return "", fmt.Errorf("failed to create sqs message: %w", err)
+			}
+			output, err := client.SendMessage(ctx, input)
+			if err != nil {
+				return "", fmt.Errorf("failed to send sqs message: %w", err)
+			}
+			if c.logVarbose {
+				l.DebugContext(r.Context(), "success sqs message sent with http request", "message_id", *output.MessageId, "queue", c.sqsQueueName)
+			}
+			return *output.MessageId, nil
+		})
+	}
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		ctx := r.Context()
 		ctx = embedLoggerInContext(ctx, logger)
 		ctx = EmbedIsWorkerInContext(ctx, false)
-		ctx = EmbedSQSMessageSenderInContext(ctx,
-			SQSMessageSenderFunc(func(r *http.Request, m MessageAttributes) (string, error) {
-				queueURL, client := c.SQSClientAndQueueURL()
-				l := Logger(r)
-				if c.logVarbose {
-					l.DebugContext(r.Context(), "try sqs send message with http request", "method", r.Method, "path", r.URL.Path)
-				}
-				input, err := serializer.NewSendMessageInput(ctx, queueURL, r, m)
-				if err != nil {
-					return "", fmt.Errorf("failed to create sqs message: %w", err)
-				}
-				output, err := client.SendMessage(r.Context(), input)
-				if err != nil {
-					return "", fmt.Errorf("failed to send sqs message: %w", err)
-				}
-				if c.logVarbose {
-					l.DebugContext(r.Context(), "success sqs message sent with http request", "message_id", *output.MessageId, "queue", c.sqsQueueName)
-				}
-				return *output.MessageId, nil
-			}),
-		)
+		ctx = EmbedSQSMessageSenderInContext(ctx, sender)
 		mux.ServeHTTP(w, r.WithContext(ctx))
 	})
 }

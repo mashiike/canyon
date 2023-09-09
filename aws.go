@@ -235,15 +235,7 @@ func convertMessageToEventRecord(queueARN *arn.ARN, message *types.Message) even
 	}
 }
 
-// fakeSQSClient は in-memoryで動作する。SQSClientの代用として使えるもの。動作としては透過的になっている。
-// SendMessageで送られたものがmemoryに保持されて、ReceiveMessageで取り出せる。
-// MessageIdはUUIDがランダムで生成される。
-// ReceiptHandleはランダムなbytesをbase64でエンコードしたものが生成される。
-// VisibirityTimeoutが考慮されており、一度ReceiveMessageで読まれたものは、VisibilityTimeoutの時間だけ、もう一度ReceivedMessageされても取り出せない。
-// DeleteMessageは、VisibilityTimeoutの時間の間でのみ有効で、それ以外の時間ではエラーになる。
-// また、VisibilityTimeoutはReceiveMessageの時に指定されたものが使われる。
-
-type fakeSQSClient struct {
+type inMemorySQSClient struct {
 	once                     sync.Once
 	mu                       sync.Mutex
 	messages                 map[string]*types.Message
@@ -257,7 +249,7 @@ type fakeSQSClient struct {
 	dlq                      *json.Encoder
 }
 
-func (c *fakeSQSClient) prepare() {
+func (c *inMemorySQSClient) prepare() {
 	c.once.Do(func() {
 		c.mu.Lock()
 		defer c.mu.Unlock()
@@ -290,7 +282,7 @@ func (c *fakeSQSClient) prepare() {
 		}
 	})
 }
-func (c *fakeSQSClient) SendMessage(ctx context.Context, params *sqs.SendMessageInput, optFns ...func(*sqs.Options)) (*sqs.SendMessageOutput, error) {
+func (c *inMemorySQSClient) SendMessage(ctx context.Context, params *sqs.SendMessageInput, optFns ...func(*sqs.Options)) (*sqs.SendMessageOutput, error) {
 	c.prepare()
 	msg := &types.Message{
 		MessageId: aws.String(uuid.New().String()),
@@ -338,7 +330,7 @@ func (c *fakeSQSClient) SendMessage(ctx context.Context, params *sqs.SendMessage
 	}, nil
 }
 
-func (c *fakeSQSClient) ReceiveMessage(ctx context.Context, params *sqs.ReceiveMessageInput, optFns ...func(*sqs.Options)) (*sqs.ReceiveMessageOutput, error) {
+func (c *inMemorySQSClient) ReceiveMessage(ctx context.Context, params *sqs.ReceiveMessageInput, optFns ...func(*sqs.Options)) (*sqs.ReceiveMessageOutput, error) {
 	c.prepare()
 	output := &sqs.ReceiveMessageOutput{}
 	outputInclude := make(map[string]bool, params.MaxNumberOfMessages)
@@ -415,7 +407,7 @@ func (c *fakeSQSClient) ReceiveMessage(ctx context.Context, params *sqs.ReceiveM
 	return output, nil
 }
 
-func (c *fakeSQSClient) DeleteMessage(ctx context.Context, params *sqs.DeleteMessageInput, optFns ...func(*sqs.Options)) (*sqs.DeleteMessageOutput, error) {
+func (c *inMemorySQSClient) DeleteMessage(ctx context.Context, params *sqs.DeleteMessageInput, optFns ...func(*sqs.Options)) (*sqs.DeleteMessageOutput, error) {
 	c.prepare()
 	c.mu.Lock()
 	defer c.mu.Unlock()
@@ -431,14 +423,14 @@ func (c *fakeSQSClient) DeleteMessage(ctx context.Context, params *sqs.DeleteMes
 	return &sqs.DeleteMessageOutput{}, nil
 }
 
-func (c *fakeSQSClient) GetQueueUrl(ctx context.Context, params *sqs.GetQueueUrlInput, optFns ...func(*sqs.Options)) (*sqs.GetQueueUrlOutput, error) {
+func (c *inMemorySQSClient) GetQueueUrl(ctx context.Context, params *sqs.GetQueueUrlInput, optFns ...func(*sqs.Options)) (*sqs.GetQueueUrlOutput, error) {
 	c.prepare()
 	return &sqs.GetQueueUrlOutput{
 		QueueUrl: aws.String(fmt.Sprintf("https://sqs.ap-northeast-1.amazonaws.com/123456789012/%s", *params.QueueName)),
 	}, nil
 }
 
-func (c *fakeSQSClient) GetQueueAttributes(ctx context.Context, params *sqs.GetQueueAttributesInput, optFns ...func(*sqs.Options)) (*sqs.GetQueueAttributesOutput, error) {
+func (c *inMemorySQSClient) GetQueueAttributes(ctx context.Context, params *sqs.GetQueueAttributesInput, optFns ...func(*sqs.Options)) (*sqs.GetQueueAttributesOutput, error) {
 	c.prepare()
 	return &sqs.GetQueueAttributesOutput{
 		Attributes: map[string]string{
@@ -447,7 +439,7 @@ func (c *fakeSQSClient) GetQueueAttributes(ctx context.Context, params *sqs.GetQ
 	}, nil
 }
 
-func (c *fakeSQSClient) MessageCount() int {
+func (c *inMemorySQSClient) MessageCount() int {
 	c.prepare()
 	c.mu.Lock()
 	defer c.mu.Unlock()
