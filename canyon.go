@@ -384,9 +384,11 @@ func newServerHandler(mux http.Handler, c *runOptions) http.Handler {
 	})
 }
 
-type lambdaHandlerFunc func(ctx context.Context, event []byte) ([]byte, error)
+// LambdaHandlerFunc is a adapter for lambda.Handler.
+type LambdaHandlerFunc func(ctx context.Context, event []byte) ([]byte, error)
 
-func (f lambdaHandlerFunc) Invoke(ctx context.Context, event []byte) ([]byte, error) {
+// Invoke invokes LambdaHandlerFunc.
+func (f LambdaHandlerFunc) Invoke(ctx context.Context, event []byte) ([]byte, error) {
 	return f(ctx, event)
 }
 
@@ -400,7 +402,7 @@ func newLambdaFallbackHandler(mux http.Handler, c *runOptions) lambda.Handler {
 		serializer.SetLogger(logger)
 	}
 	sender := newSQSMessageSender(mux, serializer, c)
-	return lambdaHandlerFunc(func(ctx context.Context, event []byte) ([]byte, error) {
+	return LambdaHandlerFunc(func(ctx context.Context, event []byte) ([]byte, error) {
 		ctx = embedLoggerInContext(ctx, logger)
 		ctx = EmbedIsWorkerInContext(ctx, false)
 		ctx = EmbedSQSMessageSenderInContext(ctx, sender)

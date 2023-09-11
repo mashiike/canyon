@@ -1,9 +1,11 @@
 package canyontest
 
 import (
+	"context"
 	"net/http"
 
 	"github.com/aws/aws-lambda-go/events"
+	"github.com/aws/aws-lambda-go/lambda"
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/mashiike/canyon"
 )
@@ -51,4 +53,19 @@ func AsServer(next http.Handler, sender canyon.SQSMessageSender) http.Handler {
 		ctx = canyon.EmbedIsWorkerInContext(ctx, false)
 		next.ServeHTTP(w, r.WithContext(ctx))
 	})
+}
+
+func AsLambdaFallback(next lambda.Handler, sender canyon.SQSMessageSender) lambda.Handler {
+	return canyon.LambdaHandlerFunc(
+		func(ctx context.Context, event []byte) ([]byte, error) {
+			if sender == nil {
+				sender = canyon.SQSMessageSenderFunc(func(r *http.Request, m canyon.MessageAttributes) (string, error) {
+					return DummySQSMessage.MessageId, nil
+				})
+			}
+			ctx = canyon.EmbedSQSMessageSenderInContext(ctx, sender)
+			ctx = canyon.EmbedIsWorkerInContext(ctx, false)
+			return next.Invoke(ctx, event)
+		},
+	)
 }
