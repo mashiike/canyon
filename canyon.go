@@ -63,13 +63,14 @@ func RunWithContext(ctx context.Context, sqsQueueName string, mux http.Handler, 
 func runWithContext(ctx context.Context, mux http.Handler, c *runOptions) error {
 	workerHandler := newWorkerHandler(mux, c)
 	serverHandler := newServerHandler(mux, c)
+	lambdaFallbackHandler := newLambdaFallbackHandler(mux, c)
 	if isLambda() {
 		lambda.StartWithOptions(
 			func(ctx context.Context, event json.RawMessage) (interface{}, error) {
 				var p eventPayload
 				if err := json.Unmarshal(event, &p); err != nil {
-					if c.lambdaFallbackHandler != nil {
-						return c.lambdaFallbackHandler.Invoke(ctx, event)
+					if lambdaFallbackHandler != nil {
+						return lambdaFallbackHandler.Invoke(ctx, event)
 					}
 					return nil, err
 				}
@@ -100,8 +101,8 @@ func runWithContext(ctx context.Context, mux http.Handler, c *runOptions) error 
 					serverHandler.ServeHTTP(w, r)
 					return w.Response(), nil
 				}
-				if c.lambdaFallbackHandler != nil {
-					return c.lambdaFallbackHandler.Invoke(ctx, event)
+				if lambdaFallbackHandler != nil {
+					return lambdaFallbackHandler.Invoke(ctx, event)
 				}
 				return nil, errors.New("unsupported event")
 			},
@@ -206,7 +207,7 @@ func runWithContext(ctx context.Context, mux http.Handler, c *runOptions) error 
 			}
 		}()
 	}
-	if c.lambdaFallbackHandler != nil {
+	if lambdaFallbackHandler != nil {
 		wg.Add(1)
 		go func() {
 			defer func() {
@@ -242,7 +243,7 @@ func runWithContext(ctx context.Context, mux http.Handler, c *runOptions) error 
 					cancel()
 					return
 				}
-				if _, err := c.lambdaFallbackHandler.Invoke(cctx, event); err != nil {
+				if _, err := lambdaFallbackHandler.Invoke(cctx, event); err != nil {
 					if !errors.Is(err, context.Canceled) && !errors.Is(err, context.DeadlineExceeded) {
 						c.DebugContextWhenVarbose(cctx, "failed to invoke fallback lambda handler", "error", err)
 						mu.Lock()
@@ -373,9 +374,45 @@ func newServerHandler(mux http.Handler, c *runOptions) http.Handler {
 	if c.logVarbose {
 		serializer.SetLogger(logger)
 	}
-	var sender SQSMessageSender
+	sender := newSQSMessageSender(mux, serializer, c)
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		ctx := r.Context()
+		ctx = embedLoggerInContext(ctx, logger)
+		ctx = EmbedIsWorkerInContext(ctx, false)
+		ctx = EmbedSQSMessageSenderInContext(ctx, sender)
+		mux.ServeHTTP(w, r.WithContext(ctx))
+	})
+}
+
+// LambdaHandlerFunc is a adapter for lambda.Handler.
+type LambdaHandlerFunc func(ctx context.Context, event []byte) ([]byte, error)
+
+// Invoke invokes LambdaHandlerFunc.
+func (f LambdaHandlerFunc) Invoke(ctx context.Context, event []byte) ([]byte, error) {
+	return f(ctx, event)
+}
+
+func newLambdaFallbackHandler(mux http.Handler, c *runOptions) lambda.Handler {
+	if c.lambdaFallbackHandler == nil {
+		return nil
+	}
+	logger := c.logger.With(slog.String(LogComponentAttributeKey, "fallback_handler"))
+	serializer := NewSerializer(c.backend)
+	if c.logVarbose {
+		serializer.SetLogger(logger)
+	}
+	sender := newSQSMessageSender(mux, serializer, c)
+	return LambdaHandlerFunc(func(ctx context.Context, event []byte) ([]byte, error) {
+		ctx = embedLoggerInContext(ctx, logger)
+		ctx = EmbedIsWorkerInContext(ctx, false)
+		ctx = EmbedSQSMessageSenderInContext(ctx, sender)
+		return c.lambdaFallbackHandler.Invoke(ctx, event)
+	})
+}
+
+func newSQSMessageSender(mux http.Handler, serializer *Serializer, c *runOptions) SQSMessageSender {
 	if isLambda() && c.useInMemorySQS {
-		sender = SQSMessageSenderFunc(func(r *http.Request, m MessageAttributes) (string, error) {
+		return SQSMessageSenderFunc(func(r *http.Request, m MessageAttributes) (string, error) {
 			// recoall mux as worker
 			ctx := EmbedIsWorkerInContext(r.Context(), true)
 			w := NewWorkerResponseWriter()
@@ -387,14 +424,13 @@ func newServerHandler(mux http.Handler, c *runOptions) http.Handler {
 			return "in-memory-message", nil
 		})
 	} else {
-		sender = SQSMessageSenderFunc(func(r *http.Request, m MessageAttributes) (string, error) {
+		return SQSMessageSenderFunc(func(r *http.Request, m MessageAttributes) (string, error) {
 			queueURL, client := c.SQSClientAndQueueURL()
 			l := Logger(r)
 			if c.logVarbose {
 				l.DebugContext(r.Context(), "try sqs send message with http request", "method", r.Method, "path", r.URL.Path)
 			}
 			ctx := r.Context()
-			ctx = embedLoggerInContext(ctx, logger)
 			input, err := serializer.NewSendMessageInput(ctx, queueURL, r, m)
 			if err != nil {
 				return "", fmt.Errorf("failed to create sqs message: %w", err)
@@ -409,13 +445,6 @@ func newServerHandler(mux http.Handler, c *runOptions) http.Handler {
 			return *output.MessageId, nil
 		})
 	}
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		ctx := r.Context()
-		ctx = embedLoggerInContext(ctx, logger)
-		ctx = EmbedIsWorkerInContext(ctx, false)
-		ctx = EmbedSQSMessageSenderInContext(ctx, sender)
-		mux.ServeHTTP(w, r.WithContext(ctx))
-	})
 }
 
 func SendToWorker(r *http.Request, messageAttrs map[string]types.MessageAttributeValue) (string, error) {
