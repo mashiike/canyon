@@ -64,6 +64,7 @@ type runOptions struct {
 	cleanupFuncs                       []func()
 	lambdaFallbackHandler              lambda.Handler
 	stdin                              io.Reader
+	serializer                         Serializer
 }
 
 func defaultRunConfig(cancel context.CancelCauseFunc, sqsQueueName string) *runOptions {
@@ -85,6 +86,7 @@ func defaultRunConfig(cancel context.CancelCauseFunc, sqsQueueName string) *runO
 		cleanupFuncs:                       []func(){},
 		lambdaFallbackHandler:              nil,
 		stdin:                              os.Stdin,
+		serializer:                         NewDefaultSerializer(),
 	}
 	if cancel != nil {
 		c.cancel = cancel
@@ -384,5 +386,14 @@ func WithLambdaFallbackHandler(handler interface{}) Option {
 func WithStdin(stdin io.Reader) Option {
 	return func(c *runOptions) {
 		c.stdin = stdin
+	}
+}
+
+// WithSerializer returns a new Option that sets the serializer.
+// for http.Request Serializetion format change.
+// if can use Backend implement BackendSerializer interface
+func WithSerializer(serializer Serializer) Option {
+	return func(c *runOptions) {
+		c.serializer = serializer
 	}
 }

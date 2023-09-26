@@ -22,6 +22,16 @@ type Serializer interface {
 	Deserialize(ctx context.Context, message *events.SQSMessage) (*http.Request, error)
 }
 
+type BackendSerializer interface {
+	Serializer
+	WithBackend(backend Backend) Serializer
+}
+
+type LoggingableSerializer interface {
+	Serializer
+	WithLogger(logger *slog.Logger) Serializer
+}
+
 // jsonSerializableRequest is a request that can be serialized to JSON.
 type jsonSerializableRequest struct {
 	BackendURL    *string             `json:"backend_url,omitempty"`
@@ -41,15 +51,29 @@ type DefaultSerializer struct {
 	Logger  *slog.Logger
 }
 
-func NewDefaultSerializer(backend Backend) *DefaultSerializer {
+func NewDefaultSerializer() *DefaultSerializer {
 	return &DefaultSerializer{
-		Backend: backend,
-		Logger:  slog.New(slog.NewTextHandler(io.Discard, &slog.HandlerOptions{Level: slog.LevelError})),
+		Logger: slog.New(slog.NewTextHandler(io.Discard, &slog.HandlerOptions{Level: slog.LevelError})),
 	}
 }
 
-func (s *DefaultSerializer) SetLogger(logger *slog.Logger) {
-	s.Logger = logger
+func (s *DefaultSerializer) WithBackend(backend Backend) Serializer {
+	cloned := s.Clone()
+	cloned.Backend = backend
+	return cloned
+}
+
+func (s *DefaultSerializer) WithLogger(logger *slog.Logger) Serializer {
+	cloned := s.Clone()
+	cloned.Logger = logger
+	return cloned
+}
+
+func (s *DefaultSerializer) Clone() *DefaultSerializer {
+	return &DefaultSerializer{
+		Backend: s.Backend,
+		Logger:  s.Logger,
+	}
 }
 
 // Serialize does serialize http.Request as SQS Message.

@@ -38,6 +38,10 @@ func RunWithContext(ctx context.Context, sqsQueueName string, mux http.Handler, 
 	defer func() {
 		c.Cleanup()
 	}()
+	if s, ok := c.serializer.(BackendSerializer); ok {
+		slog.DebugContext(ctx, "use backend", "backend", c.backend)
+		c.serializer = s.WithBackend(c.backend)
+	}
 	select {
 	case <-ctx.Done():
 		return context.Cause(ctx)
@@ -316,9 +320,9 @@ var LogComponentAttributeKey = "component"
 
 func newWorkerHandler(mux http.Handler, c *runOptions) sqsEventLambdaHandlerFunc {
 	logger := c.logger.With(slog.String(LogComponentAttributeKey, "worker"))
-	serializer := NewDefaultSerializer(c.backend)
-	if c.logVarbose {
-		serializer.SetLogger(logger)
+	serializer := c.serializer
+	if s, ok := serializer.(LoggingableSerializer); ok && c.logVarbose {
+		serializer = s.WithLogger(logger)
 	}
 	return func(ctx context.Context, event *events.SQSEvent) (*events.SQSEventResponse, error) {
 		var mu sync.Mutex
@@ -370,9 +374,9 @@ func newWorkerHandler(mux http.Handler, c *runOptions) sqsEventLambdaHandlerFunc
 
 func newServerHandler(mux http.Handler, c *runOptions) http.Handler {
 	logger := c.logger.With(slog.String(LogComponentAttributeKey, "server"))
-	serializer := NewDefaultSerializer(c.backend)
-	if c.logVarbose {
-		serializer.SetLogger(logger)
+	serializer := c.serializer
+	if s, ok := serializer.(LoggingableSerializer); ok && c.logVarbose {
+		serializer = s.WithLogger(logger)
 	}
 	sender := newSQSMessageSender(mux, serializer, c)
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -397,9 +401,9 @@ func newLambdaFallbackHandler(mux http.Handler, c *runOptions) lambda.Handler {
 		return nil
 	}
 	logger := c.logger.With(slog.String(LogComponentAttributeKey, "fallback_handler"))
-	serializer := NewDefaultSerializer(c.backend)
-	if c.logVarbose {
-		serializer.SetLogger(logger)
+	serializer := c.serializer
+	if s, ok := serializer.(LoggingableSerializer); ok && c.logVarbose {
+		serializer = s.WithLogger(logger)
 	}
 	sender := newSQSMessageSender(mux, serializer, c)
 	return LambdaHandlerFunc(func(ctx context.Context, event []byte) ([]byte, error) {
@@ -410,7 +414,7 @@ func newLambdaFallbackHandler(mux http.Handler, c *runOptions) lambda.Handler {
 	})
 }
 
-func newSQSMessageSender(mux http.Handler, serializer *DefaultSerializer, c *runOptions) SQSMessageSender {
+func newSQSMessageSender(mux http.Handler, serializer Serializer, c *runOptions) SQSMessageSender {
 	if isLambda() && c.useInMemorySQS {
 		return SQSMessageSenderFunc(func(r *http.Request, m MessageAttributes) (string, error) {
 			// recoall mux as worker
