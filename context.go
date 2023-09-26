@@ -1,7 +1,9 @@
 package canyon
 
 import (
+	"bytes"
 	"context"
+	"io"
 	"log/slog"
 	"net/http"
 )
@@ -9,9 +11,10 @@ import (
 type contextKey string
 
 var (
-	contextKeyLogger       = contextKey("logger")
-	contextKeyWorkerSender = contextKey("sqs-message-sender")
-	contextKeyIsWorker     = contextKey("is-worker")
+	contextKeyLogger            = contextKey("logger")
+	contextKeyWorkerSender      = contextKey("sqs-message-sender")
+	contextKeyIsWorker          = contextKey("is-worker")
+	contextKeyBackupRequestBody = contextKey("backup-request-body")
 )
 
 // Logger returns slog.Logger with component attribute.
@@ -67,4 +70,33 @@ func IsWorker(r *http.Request) bool {
 //	not for production use.
 func EmbedIsWorkerInContext(ctx context.Context, isWorker bool) context.Context {
 	return context.WithValue(ctx, contextKeyIsWorker, isWorker)
+}
+
+// BackupRequestBody returns backuped request body.
+// maybe http handler read request body, and serializer read request body.
+func BackupRequset(r *http.Request) (*http.Request, func() error, error) {
+	cloned := r.Clone(r.Context())
+	body, err := io.ReadAll(r.Body)
+	if err != nil {
+		return nil, r.Body.Close, err
+	}
+	cloned.Body = io.NopCloser(bytes.NewReader(body))
+	ctx := context.WithValue(cloned.Context(), contextKeyBackupRequestBody, body)
+	cloned = cloned.WithContext(ctx)
+	return cloned, r.Body.Close, err
+}
+
+// RestoreRequest restores request body from backuped request body.
+func RestoreRequest(r *http.Request) *http.Request {
+	ctx := r.Context()
+	if ctx == nil {
+		return r
+	}
+	body, ok := ctx.Value(contextKeyBackupRequestBody).([]byte)
+	if !ok {
+		return r
+	}
+	cloned := r.Clone(ctx)
+	cloned.Body = io.NopCloser(bytes.NewReader(body))
+	return cloned
 }
