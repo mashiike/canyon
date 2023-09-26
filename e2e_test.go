@@ -3,7 +3,9 @@ package canyon_test
 import (
 	"context"
 	"errors"
+	"io"
 	"net/http"
+	"strings"
 	"testing"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
@@ -82,4 +84,32 @@ func TestE2E_SendToWorkerFailed(t *testing.T) {
 	require.NoError(t, err, "should post")
 	defer resp.Body.Close()
 	require.Equal(t, http.StatusInternalServerError, resp.StatusCode, "should return 500")
+}
+
+func TestE2E__HandlerReadBody(t *testing.T) {
+	var serverBody, workerBody []byte
+	r := canyontest.NewRunner(
+		http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			var err error
+			defer r.Body.Close()
+			if !canyon.IsWorker(r) {
+				serverBody, err = io.ReadAll(r.Body)
+				require.NoError(t, err, "should read body")
+				if _, err := canyon.SendToWorker(r, nil); err != nil {
+					require.EqualError(t, err, "failed to send sqs message: test")
+					w.WriteHeader(http.StatusInternalServerError)
+					return
+				}
+			}
+			workerBody, err = io.ReadAll(r.Body)
+			w.WriteHeader(http.StatusOK)
+		}),
+	)
+	defer r.Close()
+	resp, err := http.Post(r.URL, "text/plain", strings.NewReader("hello world"))
+	require.NoError(t, err, "should post")
+	defer resp.Body.Close()
+	require.Equal(t, http.StatusOK, resp.StatusCode, "should return 200")
+	require.Equal(t, "hello world", string(serverBody), "should read body")
+	require.Equal(t, "hello world", string(workerBody), "should read body")
 }
