@@ -6,6 +6,7 @@ import (
 	"io"
 	"net/http"
 	"strings"
+	"sync"
 	"testing"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
@@ -88,6 +89,8 @@ func TestE2E_SendToWorkerFailed(t *testing.T) {
 
 func TestE2E__HandlerReadBody(t *testing.T) {
 	var serverBody, workerBody []byte
+	var wg sync.WaitGroup
+	wg.Add(1)
 	r := canyontest.NewRunner(
 		http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			var err error
@@ -100,9 +103,12 @@ func TestE2E__HandlerReadBody(t *testing.T) {
 					w.WriteHeader(http.StatusInternalServerError)
 					return
 				}
+				w.WriteHeader(http.StatusOK)
+				return
 			}
 			workerBody, err = io.ReadAll(r.Body)
 			w.WriteHeader(http.StatusOK)
+			wg.Done()
 		}),
 	)
 	defer r.Close()
@@ -110,6 +116,7 @@ func TestE2E__HandlerReadBody(t *testing.T) {
 	require.NoError(t, err, "should post")
 	defer resp.Body.Close()
 	require.Equal(t, http.StatusOK, resp.StatusCode, "should return 200")
+	wg.Wait()
 	require.Equal(t, "hello world", string(serverBody), "should read body")
 	require.Equal(t, "hello world", string(workerBody), "should read body")
 }

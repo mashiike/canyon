@@ -385,7 +385,14 @@ func newServerHandler(mux http.Handler, c *runOptions) http.Handler {
 		ctx = embedLoggerInContext(ctx, logger)
 		ctx = EmbedIsWorkerInContext(ctx, false)
 		ctx = EmbedWorkerSenderInContext(ctx, sender)
-		mux.ServeHTTP(w, r.WithContext(ctx))
+		cloned, closer, err := BackupRequset(r.WithContext(ctx))
+		if err != nil {
+			logger.ErrorContext(ctx, "failed to backup request", "error", err)
+			http.Error(w, "internal server error", http.StatusInternalServerError)
+			return
+		}
+		defer closer()
+		mux.ServeHTTP(w, cloned)
 	})
 }
 
@@ -436,7 +443,7 @@ func newWorkerSender(mux http.Handler, serializer Serializer, c *runOptions) Wor
 				l.DebugContext(r.Context(), "try sqs send message with http request", "method", r.Method, "path", r.URL.Path)
 			}
 			ctx := r.Context()
-			input, err := serializer.Serialize(ctx, r)
+			input, err := serializer.Serialize(ctx, RestoreRequest(r))
 			if err != nil {
 				return "", fmt.Errorf("failed to serialize request: %w", err)
 			}
