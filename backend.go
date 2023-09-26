@@ -77,6 +77,18 @@ func NewInMemoryBackend() *InMemoryBackend {
 	}
 }
 
+func (b *InMemoryBackend) Entries() map[string][]byte {
+	b.mu.RLock()
+	defer b.mu.RUnlock()
+	ret := make(map[string][]byte)
+	for k, v := range b.storedRequestBody {
+		dest := make([]byte, len(v))
+		copy(dest, v)
+		ret[k] = dest
+	}
+	return ret
+}
+
 // SaveRequestBody stores request body in memory.
 func (b *InMemoryBackend) SaveRequestBody(ctx context.Context, req *http.Request) (*url.URL, error) {
 	b.mu.Lock()
