@@ -26,34 +26,34 @@ func (b *mockBackend) LoadRequestBody(_ context.Context, _ *url.URL) (io.ReadClo
 	return io.NopCloser(strings.NewReader("hello=world")), nil
 }
 
-func TestSerializerSerialize__NonBackend(t *testing.T) {
+func TestDefaultSerializerSerialize__NonBackend(t *testing.T) {
 	req, err := ridge.NewRequest(ReadFile(t, "testdata/http_event.json"))
 	require.NoError(t, err, "should create request")
 
-	serializer := NewSerializer(nil)
+	serializer := NewDefaultSerializer()
 	serialized, err := serializer.Serialize(context.Background(), req)
 	require.NoError(t, err, "should serialize request")
 
 	require.JSONEq(t, string(ReadFile(t, "testdata/serialized_http_request.json")), string(serialized.Body), "same as expected serialized request")
 }
 
-func TestSerializerSerialize__MockBackend(t *testing.T) {
+func TestDefaultSerializerSerialize__MockBackend(t *testing.T) {
 	req, err := ridge.NewRequest(ReadFile(t, "testdata/http_event.json"))
 	require.NoError(t, err, "should create request")
 
-	serializer := NewSerializer(&mockBackend{})
+	serializer := NewDefaultSerializer().WithBackend(&mockBackend{})
 	serialized, err := serializer.Serialize(context.Background(), req)
 	require.NoError(t, err, "should serialize request")
 
 	require.JSONEq(t, string(ReadFile(t, "testdata/serialized_http_request_with_mock_backend.json")), string(serialized.Body), "same as expected serialized request")
 }
 
-func TestSerializerDesirialize__NonBackend(t *testing.T) {
+func TestDefaultSerializerDesirialize__NonBackend(t *testing.T) {
 	sqsEvent := ReadJSON[events.SQSEvent](t, "testdata/sqs_event.json")
 	message := sqsEvent.Records[0]
 
-	serializer := NewSerializer(nil)
-	req, err := serializer.Deserialize(context.Background(), message)
+	serializer := NewDefaultSerializer()
+	req, err := serializer.Deserialize(context.Background(), &message)
 	require.NoError(t, err, "should deserialize request")
 
 	require.Equal(t, "POST", req.Method, "should be POST")
@@ -88,12 +88,12 @@ func TestSerializerDesirialize__NonBackend(t *testing.T) {
 	require.Equal(t, "bar baz", req.Form.Get("foo"), "should be foo=bar%20baz")
 }
 
-func TestSerializerDesirialize__MockBackend(t *testing.T) {
+func TestDefaultSerializerDesirialize__MockBackend(t *testing.T) {
 	sqsEvent := ReadJSON[events.SQSEvent](t, "testdata/sqs_event_with_mock_backend.json")
 	message := sqsEvent.Records[0]
 
-	serializer := NewSerializer(&mockBackend{})
-	req, err := serializer.Deserialize(context.Background(), message)
+	serializer := NewDefaultSerializer().WithBackend(&mockBackend{})
+	req, err := serializer.Deserialize(context.Background(), &message)
 	require.NoError(t, err, "should deserialize request")
 
 	require.Equal(t, "POST", req.Method, "should be POST")

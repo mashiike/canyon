@@ -17,8 +17,23 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/sqs/types"
 )
 
-// JSONSerializableRequest is a request that can be serialized to JSON.
-type JSONSerializableRequest struct {
+type Serializer interface {
+	Serialize(ctx context.Context, r *http.Request) (*events.SQSMessage, error)
+	Deserialize(ctx context.Context, message *events.SQSMessage) (*http.Request, error)
+}
+
+type BackendSerializer interface {
+	Serializer
+	WithBackend(backend Backend) Serializer
+}
+
+type LoggingableSerializer interface {
+	Serializer
+	WithLogger(logger *slog.Logger) Serializer
+}
+
+// jsonSerializableRequest is a request that can be serialized to JSON.
+type jsonSerializableRequest struct {
 	BackendURL    *string             `json:"backend_url,omitempty"`
 	Method        string              `json:"method,omitempty"`
 	Header        map[string][]string `json:"header,omitempty"`
@@ -30,26 +45,40 @@ type JSONSerializableRequest struct {
 	URL           string              `json:"url,omitempty"`
 }
 
-// Serializer is a struct for Serialize and Deserialize http.Request as SQS Message.
-type Serializer struct {
+// DefaultSerializer is a struct for Serialize and Deserialize http.Request as SQS Message.
+type DefaultSerializer struct {
 	Backend Backend
 	Logger  *slog.Logger
 }
 
-func NewSerializer(backend Backend) *Serializer {
-	return &Serializer{
-		Backend: backend,
-		Logger:  slog.New(slog.NewTextHandler(io.Discard, &slog.HandlerOptions{Level: slog.LevelError})),
+func NewDefaultSerializer() *DefaultSerializer {
+	return &DefaultSerializer{
+		Logger: slog.New(slog.NewTextHandler(io.Discard, &slog.HandlerOptions{Level: slog.LevelError})),
 	}
 }
 
-func (s *Serializer) SetLogger(logger *slog.Logger) {
-	s.Logger = logger
+func (s *DefaultSerializer) WithBackend(backend Backend) Serializer {
+	cloned := s.Clone()
+	cloned.Backend = backend
+	return cloned
+}
+
+func (s *DefaultSerializer) WithLogger(logger *slog.Logger) Serializer {
+	cloned := s.Clone()
+	cloned.Logger = logger
+	return cloned
+}
+
+func (s *DefaultSerializer) Clone() *DefaultSerializer {
+	return &DefaultSerializer{
+		Backend: s.Backend,
+		Logger:  s.Logger,
+	}
 }
 
 // Serialize does serialize http.Request as SQS Message.
-func (s *Serializer) Serialize(ctx context.Context, r *http.Request) (*events.SQSMessage, error) {
-	sr := &JSONSerializableRequest{
+func (s *DefaultSerializer) Serialize(ctx context.Context, r *http.Request) (*events.SQSMessage, error) {
+	sr := &jsonSerializableRequest{
 		Method:        r.Method,
 		Header:        r.Header,
 		ContentLength: r.ContentLength,
@@ -83,8 +112,8 @@ func (s *Serializer) Serialize(ctx context.Context, r *http.Request) (*events.SQ
 }
 
 // Deserialize does deserialize SQS Message as http.Request.
-func (s *Serializer) Deserialize(ctx context.Context, message events.SQSMessage) (*http.Request, error) {
-	sr := &JSONSerializableRequest{}
+func (s *DefaultSerializer) Deserialize(ctx context.Context, message *events.SQSMessage) (*http.Request, error) {
+	sr := &jsonSerializableRequest{}
 	if err := json.Unmarshal([]byte(message.Body), sr); err != nil {
 		return nil, fmt.Errorf("failed to unmarshal request: %w", err)
 	}
@@ -122,16 +151,35 @@ func (s *Serializer) Deserialize(ctx context.Context, message events.SQSMessage)
 	return r, nil
 }
 
-// NewSendMessageInput does create SendMessageInput from http.Request.
-func (s *Serializer) NewSendMessageInput(ctx context.Context, sqsQueueURL string, r *http.Request, messageAttrs map[string]types.MessageAttributeValue) (*sqs.SendMessageInput, error) {
+// newSendMessageInput does create SendMessageInput from http.Request.
+func newSendMessageInput(ctx context.Context, s Serializer, sqsQueueURL string, r *http.Request, messageAttrs map[string]types.MessageAttributeValue) (*sqs.SendMessageInput, error) {
 	msg, err := s.Serialize(ctx, r)
 	if err != nil {
 		return nil, fmt.Errorf("failed to serialize request: %w", err)
 	}
+	attrs := make(map[string]types.MessageAttributeValue, len(messageAttrs)+len(msg.MessageAttributes))
+	for k, v := range msg.MessageAttributes {
+		attrs[k] = types.MessageAttributeValue{
+			DataType:         aws.String(v.DataType),
+			BinaryValue:      v.BinaryValue,
+			StringValue:      v.StringValue,
+			BinaryListValues: v.BinaryListValues,
+			StringListValues: v.StringListValues,
+		}
+	}
+	for k, v := range messageAttrs {
+		attrs[k] = types.MessageAttributeValue{
+			DataType:         v.DataType,
+			BinaryValue:      v.BinaryValue,
+			StringValue:      v.StringValue,
+			BinaryListValues: v.BinaryListValues,
+			StringListValues: v.StringListValues,
+		}
+	}
 	params := &sqs.SendMessageInput{
 		MessageBody:       aws.String(msg.Body),
 		QueueUrl:          aws.String(sqsQueueURL),
-		MessageAttributes: messageAttrs,
+		MessageAttributes: attrs,
 	}
 	return params, nil
 }
