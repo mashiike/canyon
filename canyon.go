@@ -330,7 +330,7 @@ func newWorkerHandler(mux http.Handler, c *runOptions) sqsEventLambdaHandlerFunc
 			go func(record events.SQSMessage) {
 				defer wg.Done()
 				w := NewWorkerResponseWriter()
-				r, err := serializer.Deserialize(ctx, record)
+				r, err := serializer.Deserialize(ctx, &record)
 				if err != nil {
 					_logger.ErrorContext(
 						ctx,
@@ -431,7 +431,7 @@ func newSQSMessageSender(mux http.Handler, serializer *DefaultSerializer, c *run
 				l.DebugContext(r.Context(), "try sqs send message with http request", "method", r.Method, "path", r.URL.Path)
 			}
 			ctx := r.Context()
-			input, err := serializer.NewSendMessageInput(ctx, queueURL, r, m)
+			input, err := newSendMessageInput(ctx, serializer, queueURL, r, m)
 			if err != nil {
 				return "", fmt.Errorf("failed to create sqs message: %w", err)
 			}

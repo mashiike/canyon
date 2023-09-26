@@ -53,7 +53,7 @@ func TestDefaultSerializerDesirialize__NonBackend(t *testing.T) {
 	message := sqsEvent.Records[0]
 
 	serializer := NewDefaultSerializer(nil)
-	req, err := serializer.Deserialize(context.Background(), message)
+	req, err := serializer.Deserialize(context.Background(), &message)
 	require.NoError(t, err, "should deserialize request")
 
 	require.Equal(t, "POST", req.Method, "should be POST")
@@ -93,7 +93,7 @@ func TestDefaultSerializerDesirialize__MockBackend(t *testing.T) {
 	message := sqsEvent.Records[0]
 
 	serializer := NewDefaultSerializer(&mockBackend{})
-	req, err := serializer.Deserialize(context.Background(), message)
+	req, err := serializer.Deserialize(context.Background(), &message)
 	require.NoError(t, err, "should deserialize request")
 
 	require.Equal(t, "POST", req.Method, "should be POST")

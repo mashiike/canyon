@@ -36,7 +36,7 @@ var DummySQSMessage = events.SQSMessage{
 func AsWorker(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		ctx := canyon.EmbedIsWorkerInContext(r.Context(), true)
-		r = canyon.SetSQSMessageHeader(r, DummySQSMessage)
+		r = canyon.SetSQSMessageHeader(r, &DummySQSMessage)
 		next.ServeHTTP(w, r.WithContext(ctx))
 	})
 }

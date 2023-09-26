@@ -77,7 +77,7 @@ func HeaderSQSMessageAttribute(name, dataType string) string {
 }
 
 // Set SQS Message headers to Request
-func SetSQSMessageHeader(r *http.Request, message events.SQSMessage) *http.Request {
+func SetSQSMessageHeader(r *http.Request, message *events.SQSMessage) *http.Request {
 	r.Header.Set(HeaderSQSMessageId, message.MessageId)
 	r.Header.Set(HeaderSQSEventSource, message.EventSource)
 	r.Header.Set(HeaderSQSEventSourceArn, message.EventSourceARN)
