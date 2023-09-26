@@ -37,7 +37,7 @@ func Example() {
 			return
 		}
 		// handle from sqs message
-		logger.Info("handle webhook directly", "method", r.Method, "path", r.URL.Path, "message_id", r.Header.Get(canyon.HeaderSQSMessageId))
+		logger.Info("handle webhook directly", "method", r.Method, "path", r.URL.Path, "message_id", r.Header.Get(canyon.HeaderSQSMessageID))
 		bs, err := io.ReadAll(r.Body)
 		if err != nil {
 			logger.Error("failed to read body", "error", err)

@@ -100,7 +100,7 @@ func TestDefaultSerializerDesirialize__MockBackend(t *testing.T) {
 	require.Equal(t, "abcdefg.execute-api.ap-northeast-1.amazonaws.com", req.Host, "should be abcdefg.execute-api.ap-northeast-1.amazonaws.com")
 	require.Equal(t, "/", req.URL.Path, "should be /")
 	require.Equal(t, "203.0.113.1", req.RemoteAddr, "should be 203.0.113.1")
-	require.Equal(t, "00000000-0000-0000-0000-000000000000", req.Header.Get(HeaderSQSMessageId), "should be include sqs message id")
+	require.Equal(t, "00000000-0000-0000-0000-000000000000", req.Header.Get(HeaderSQSMessageID), "should be include sqs message id")
 	require.Equal(t, "aws:sqs", req.Header.Get(HeaderSQSEventSource), "should be include sqs event source")
 	require.Equal(t, "arn:aws:sqs:ap-northeast-1:123456789012:sqs-queue", req.Header.Get(HeaderSQSEventSourceArn), "should be include sqs event source arn")
 	err = req.ParseForm()

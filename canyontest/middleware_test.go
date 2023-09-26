@@ -46,7 +46,7 @@ func TestAsWorker(t *testing.T) {
 			require.True(t, canyon.IsWorker(r), "should be worker")
 			_, err := canyon.SendToWorker(r, nil)
 			require.Error(t, err, "should can not send to sqs from worker")
-			require.Equal(t, canyontest.DummySQSMessage.MessageId, r.Header.Get(canyon.HeaderSQSMessageId), "should embed sqs message id")
+			require.Equal(t, canyontest.DummySQSMessage.MessageId, r.Header.Get(canyon.HeaderSQSMessageID), "should embed sqs message id")
 			w.WriteHeader(http.StatusOK)
 		}),
 	)

@@ -57,7 +57,8 @@ func coalesce(strs ...*string) string {
 
 // this headers are request headers, when run on worker.
 const (
-	HeaderSQSMessageId              = "Sqs-Message-Id"
+	HeaderSQSMessageID              = "Sqs-Message-Id"
+	HeaderSQSMessageGroupID         = "Sqs-Message-Group-Id"
 	HeaderSQSEventSource            = "Sqs-Event-Source"
 	HeaderSQSEventSourceArn         = "Sqs-Event-Source-Arn"
 	HeaderSQSAwsRegionHeader        = "Sqs-Aws-Region"
@@ -77,7 +78,7 @@ func HeaderSQSMessageAttribute(name, dataType string) string {
 
 // Set SQS Message headers to Request
 func SetSQSMessageHeader(r *http.Request, message *events.SQSMessage) *http.Request {
-	r.Header.Set(HeaderSQSMessageId, message.MessageId)
+	r.Header.Set(HeaderSQSMessageID, message.MessageId)
 	r.Header.Set(HeaderSQSEventSource, message.EventSource)
 	r.Header.Set(HeaderSQSEventSourceArn, message.EventSourceARN)
 	r.Header.Set(HeaderSQSAwsRegionHeader, message.AWSRegion)

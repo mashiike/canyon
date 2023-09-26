@@ -107,6 +107,9 @@ func (s *DefaultSerializer) Serialize(ctx context.Context, r *http.Request) (*sq
 	msg := &sqs.SendMessageInput{
 		MessageBody: aws.String(string(bs)),
 	}
+	if str := r.Header.Get(HeaderSQSMessageGroupID); str != "" {
+		msg.MessageGroupId = aws.String(str)
+	}
 	return msg, nil
 }
 
