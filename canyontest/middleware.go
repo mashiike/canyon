@@ -45,7 +45,7 @@ func AsWorker(next http.Handler) http.Handler {
 func AsServer(next http.Handler, sender canyon.WorkerSender) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if sender == nil {
-			sender = canyon.WorkerSenderFunc(func(r *http.Request, m canyon.MessageAttributes) (string, error) {
+			sender = canyon.WorkerSenderFunc(func(r *http.Request, opts *canyon.SendOptions) (string, error) {
 				return DummySQSMessage.MessageId, nil
 			})
 		}
@@ -59,7 +59,7 @@ func AsLambdaFallback(next lambda.Handler, sender canyon.WorkerSender) lambda.Ha
 	return canyon.LambdaHandlerFunc(
 		func(ctx context.Context, event []byte) ([]byte, error) {
 			if sender == nil {
-				sender = canyon.WorkerSenderFunc(func(r *http.Request, m canyon.MessageAttributes) (string, error) {
+				sender = canyon.WorkerSenderFunc(func(r *http.Request, opts *canyon.SendOptions) (string, error) {
 					return DummySQSMessage.MessageId, nil
 				})
 			}

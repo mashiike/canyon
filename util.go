@@ -16,7 +16,6 @@ import (
 
 	"github.com/aws/aws-lambda-go/events"
 	"github.com/aws/aws-sdk-go-v2/aws"
-	"github.com/aws/aws-sdk-go-v2/service/sqs/types"
 )
 
 // camelCaseToKebabCase converts camelCase to kebab-case.
@@ -140,16 +139,16 @@ func md5Digest(s string) string {
 }
 
 // ToMessageAttributes converts http.Header to SQS MessageAttributes.
-func ToMessageAttributes(h http.Header) MessageAttributes {
-	m := make(map[string]types.MessageAttributeValue, len(h))
+func ToMessageAttributes(h http.Header) map[string]MessageAttributeValue {
+	m := make(map[string]MessageAttributeValue, len(h))
 	for k, v := range h {
 		if len(v) == 0 {
 			continue
 		}
 		k := kebabCaseToCamelCase(k)
 		if len(v) == 1 {
-			m[k] = types.MessageAttributeValue{
-				DataType:    aws.String("String"),
+			m[k] = MessageAttributeValue{
+				DataType:    "String",
 				StringValue: aws.String(v[0]),
 			}
 			continue
@@ -158,8 +157,8 @@ func ToMessageAttributes(h http.Header) MessageAttributes {
 		for i, s := range v {
 			sl[i] = s
 		}
-		m[k] = types.MessageAttributeValue{
-			DataType:         aws.String("String"),
+		m[k] = MessageAttributeValue{
+			DataType:         "String",
 			StringListValues: sl,
 		}
 	}
