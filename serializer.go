@@ -30,25 +30,25 @@ type jsonSerializableRequest struct {
 	URL           string              `json:"url,omitempty"`
 }
 
-// Serializer is a struct for Serialize and Deserialize http.Request as SQS Message.
-type Serializer struct {
+// DefaultSerializer is a struct for Serialize and Deserialize http.Request as SQS Message.
+type DefaultSerializer struct {
 	Backend Backend
 	Logger  *slog.Logger
 }
 
-func NewSerializer(backend Backend) *Serializer {
-	return &Serializer{
+func NewDefaultSerializer(backend Backend) *DefaultSerializer {
+	return &DefaultSerializer{
 		Backend: backend,
 		Logger:  slog.New(slog.NewTextHandler(io.Discard, &slog.HandlerOptions{Level: slog.LevelError})),
 	}
 }
 
-func (s *Serializer) SetLogger(logger *slog.Logger) {
+func (s *DefaultSerializer) SetLogger(logger *slog.Logger) {
 	s.Logger = logger
 }
 
 // Serialize does serialize http.Request as SQS Message.
-func (s *Serializer) Serialize(ctx context.Context, r *http.Request) (*events.SQSMessage, error) {
+func (s *DefaultSerializer) Serialize(ctx context.Context, r *http.Request) (*events.SQSMessage, error) {
 	sr := &jsonSerializableRequest{
 		Method:        r.Method,
 		Header:        r.Header,
@@ -83,7 +83,7 @@ func (s *Serializer) Serialize(ctx context.Context, r *http.Request) (*events.SQ
 }
 
 // Deserialize does deserialize SQS Message as http.Request.
-func (s *Serializer) Deserialize(ctx context.Context, message events.SQSMessage) (*http.Request, error) {
+func (s *DefaultSerializer) Deserialize(ctx context.Context, message events.SQSMessage) (*http.Request, error) {
 	sr := &jsonSerializableRequest{}
 	if err := json.Unmarshal([]byte(message.Body), sr); err != nil {
 		return nil, fmt.Errorf("failed to unmarshal request: %w", err)
@@ -123,7 +123,7 @@ func (s *Serializer) Deserialize(ctx context.Context, message events.SQSMessage)
 }
 
 // NewSendMessageInput does create SendMessageInput from http.Request.
-func (s *Serializer) NewSendMessageInput(ctx context.Context, sqsQueueURL string, r *http.Request, messageAttrs map[string]types.MessageAttributeValue) (*sqs.SendMessageInput, error) {
+func (s *DefaultSerializer) NewSendMessageInput(ctx context.Context, sqsQueueURL string, r *http.Request, messageAttrs map[string]types.MessageAttributeValue) (*sqs.SendMessageInput, error) {
 	msg, err := s.Serialize(ctx, r)
 	if err != nil {
 		return nil, fmt.Errorf("failed to serialize request: %w", err)
