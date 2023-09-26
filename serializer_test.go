@@ -34,7 +34,7 @@ func TestDefaultSerializerSerialize__NonBackend(t *testing.T) {
 	serialized, err := serializer.Serialize(context.Background(), req)
 	require.NoError(t, err, "should serialize request")
 
-	require.JSONEq(t, string(ReadFile(t, "testdata/serialized_http_request.json")), string(serialized.Body), "same as expected serialized request")
+	require.JSONEq(t, string(ReadFile(t, "testdata/serialized_http_request.json")), string(*serialized.MessageBody), "same as expected serialized request")
 }
 
 func TestDefaultSerializerSerialize__MockBackend(t *testing.T) {
@@ -45,7 +45,7 @@ func TestDefaultSerializerSerialize__MockBackend(t *testing.T) {
 	serialized, err := serializer.Serialize(context.Background(), req)
 	require.NoError(t, err, "should serialize request")
 
-	require.JSONEq(t, string(ReadFile(t, "testdata/serialized_http_request_with_mock_backend.json")), string(serialized.Body), "same as expected serialized request")
+	require.JSONEq(t, string(ReadFile(t, "testdata/serialized_http_request_with_mock_backend.json")), string(*serialized.MessageBody), "same as expected serialized request")
 }
 
 func TestDefaultSerializerDesirialize__NonBackend(t *testing.T) {
