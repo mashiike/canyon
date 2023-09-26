@@ -16,7 +16,6 @@ import (
 
 	"github.com/aws/aws-lambda-go/events"
 	"github.com/aws/aws-sdk-go-v2/aws"
-	"github.com/aws/aws-sdk-go-v2/service/sqs/types"
 )
 
 // camelCaseToKebabCase converts camelCase to kebab-case.
@@ -58,7 +57,8 @@ func coalesce(strs ...*string) string {
 
 // this headers are request headers, when run on worker.
 const (
-	HeaderSQSMessageId              = "Sqs-Message-Id"
+	HeaderSQSMessageID              = "Sqs-Message-Id"
+	HeaderSQSMessageGroupID         = "Sqs-Message-Group-Id"
 	HeaderSQSEventSource            = "Sqs-Event-Source"
 	HeaderSQSEventSourceArn         = "Sqs-Event-Source-Arn"
 	HeaderSQSAwsRegionHeader        = "Sqs-Aws-Region"
@@ -78,7 +78,7 @@ func HeaderSQSMessageAttribute(name, dataType string) string {
 
 // Set SQS Message headers to Request
 func SetSQSMessageHeader(r *http.Request, message *events.SQSMessage) *http.Request {
-	r.Header.Set(HeaderSQSMessageId, message.MessageId)
+	r.Header.Set(HeaderSQSMessageID, message.MessageId)
 	r.Header.Set(HeaderSQSEventSource, message.EventSource)
 	r.Header.Set(HeaderSQSEventSourceArn, message.EventSourceARN)
 	r.Header.Set(HeaderSQSAwsRegionHeader, message.AWSRegion)
@@ -140,16 +140,16 @@ func md5Digest(s string) string {
 }
 
 // ToMessageAttributes converts http.Header to SQS MessageAttributes.
-func ToMessageAttributes(h http.Header) MessageAttributes {
-	m := make(map[string]types.MessageAttributeValue, len(h))
+func ToMessageAttributes(h http.Header) map[string]MessageAttributeValue {
+	m := make(map[string]MessageAttributeValue, len(h))
 	for k, v := range h {
 		if len(v) == 0 {
 			continue
 		}
 		k := kebabCaseToCamelCase(k)
 		if len(v) == 1 {
-			m[k] = types.MessageAttributeValue{
-				DataType:    aws.String("String"),
+			m[k] = MessageAttributeValue{
+				DataType:    "String",
 				StringValue: aws.String(v[0]),
 			}
 			continue
@@ -158,8 +158,8 @@ func ToMessageAttributes(h http.Header) MessageAttributes {
 		for i, s := range v {
 			sl[i] = s
 		}
-		m[k] = types.MessageAttributeValue{
-			DataType:         aws.String("String"),
+		m[k] = MessageAttributeValue{
+			DataType:         "String",
 			StringListValues: sl,
 		}
 	}

@@ -287,7 +287,7 @@ func TestServerLogic(t *testing.T) {
         // canyon.SendToWorker(r, nil)
         // canyon.IsWorker(r) == false
     })
-    sender := canyon.SQSMessageSenderFunc(func(r *http.Request, m canyon.MessageAttributes) (string, error) {
+    sender := canyon.WorkerSenderFunc(func(r *http.Request, m canyon.MessageAttributes) (string, error) {
         // call from canyon.SendToWorker()
         return "message-id", nil
     })

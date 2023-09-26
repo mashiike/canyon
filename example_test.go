@@ -20,11 +20,13 @@ func Example() {
 		if !canyon.IsWorker(r) {
 			logger.Info("handle webhook directly", "method", r.Method, "path", r.URL.Path)
 			// handle webhook directly
-			messageId, err := canyon.SendToWorker(r, canyon.ToMessageAttributes(
-				http.Header{
-					"User-Name": []string{"test user"},
-				},
-			))
+			messageId, err := canyon.SendToWorker(r, &canyon.SendOptions{
+				MessageAttributes: canyon.ToMessageAttributes(
+					http.Header{
+						"User-Name": []string{"test user"},
+					},
+				),
+			})
 			if err != nil {
 				logger.Error("failed to send sqs message", "error", err)
 				w.WriteHeader(http.StatusInternalServerError)
@@ -35,7 +37,7 @@ func Example() {
 			return
 		}
 		// handle from sqs message
-		logger.Info("handle webhook directly", "method", r.Method, "path", r.URL.Path, "message_id", r.Header.Get(canyon.HeaderSQSMessageId))
+		logger.Info("handle webhook directly", "method", r.Method, "path", r.URL.Path, "message_id", r.Header.Get(canyon.HeaderSQSMessageID))
 		bs, err := io.ReadAll(r.Body)
 		if err != nil {
 			logger.Error("failed to read body", "error", err)

@@ -12,7 +12,6 @@ import (
 
 	"github.com/aws/aws-lambda-go/events"
 	"github.com/aws/aws-sdk-go-v2/aws"
-	"github.com/aws/aws-sdk-go-v2/service/sqs/types"
 	"github.com/fujiwara/ridge"
 	"github.com/stretchr/testify/require"
 )
@@ -95,14 +94,16 @@ func TestServerHandler(t *testing.T) {
 		err := r.ParseForm()
 		require.NoError(t, err, "should parse form")
 		require.Equal(t, "bar baz", r.Form.Get("foo"))
-		messageId, err = SendToWorker(r, map[string]types.MessageAttributeValue{
-			"foo": {
-				DataType:    aws.String("String"),
-				StringValue: aws.String("bar"),
-			},
-			"number": {
-				DataType:    aws.String("Number"),
-				StringValue: aws.String("123"),
+		messageId, err = SendToWorker(r, &SendOptions{
+			MessageAttributes: map[string]MessageAttributeValue{
+				"foo": {
+					DataType:    "String",
+					StringValue: aws.String("bar"),
+				},
+				"number": {
+					DataType:    "Number",
+					StringValue: aws.String("123"),
+				},
 			},
 		})
 		require.NoError(t, err, "should send to sqs")

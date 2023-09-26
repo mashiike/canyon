@@ -42,28 +42,28 @@ func AsWorker(next http.Handler) http.Handler {
 }
 
 // AsServer returns http.Handler that embeds logger and sqs message sender in context.
-func AsServer(next http.Handler, sender canyon.SQSMessageSender) http.Handler {
+func AsServer(next http.Handler, sender canyon.WorkerSender) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if sender == nil {
-			sender = canyon.SQSMessageSenderFunc(func(r *http.Request, m canyon.MessageAttributes) (string, error) {
+			sender = canyon.WorkerSenderFunc(func(r *http.Request, opts *canyon.SendOptions) (string, error) {
 				return DummySQSMessage.MessageId, nil
 			})
 		}
-		ctx := canyon.EmbedSQSMessageSenderInContext(r.Context(), sender)
+		ctx := canyon.EmbedWorkerSenderInContext(r.Context(), sender)
 		ctx = canyon.EmbedIsWorkerInContext(ctx, false)
 		next.ServeHTTP(w, r.WithContext(ctx))
 	})
 }
 
-func AsLambdaFallback(next lambda.Handler, sender canyon.SQSMessageSender) lambda.Handler {
+func AsLambdaFallback(next lambda.Handler, sender canyon.WorkerSender) lambda.Handler {
 	return canyon.LambdaHandlerFunc(
 		func(ctx context.Context, event []byte) ([]byte, error) {
 			if sender == nil {
-				sender = canyon.SQSMessageSenderFunc(func(r *http.Request, m canyon.MessageAttributes) (string, error) {
+				sender = canyon.WorkerSenderFunc(func(r *http.Request, opts *canyon.SendOptions) (string, error) {
 					return DummySQSMessage.MessageId, nil
 				})
 			}
-			ctx = canyon.EmbedSQSMessageSenderInContext(ctx, sender)
+			ctx = canyon.EmbedWorkerSenderInContext(ctx, sender)
 			ctx = canyon.EmbedIsWorkerInContext(ctx, false)
 			return next.Invoke(ctx, event)
 		},
