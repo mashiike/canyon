@@ -17,8 +17,8 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/sqs/types"
 )
 
-// JSONSerializableRequest is a request that can be serialized to JSON.
-type JSONSerializableRequest struct {
+// jsonSerializableRequest is a request that can be serialized to JSON.
+type jsonSerializableRequest struct {
 	BackendURL    *string             `json:"backend_url,omitempty"`
 	Method        string              `json:"method,omitempty"`
 	Header        map[string][]string `json:"header,omitempty"`
@@ -49,7 +49,7 @@ func (s *Serializer) SetLogger(logger *slog.Logger) {
 
 // Serialize does serialize http.Request as SQS Message.
 func (s *Serializer) Serialize(ctx context.Context, r *http.Request) (*events.SQSMessage, error) {
-	sr := &JSONSerializableRequest{
+	sr := &jsonSerializableRequest{
 		Method:        r.Method,
 		Header:        r.Header,
 		ContentLength: r.ContentLength,
@@ -84,7 +84,7 @@ func (s *Serializer) Serialize(ctx context.Context, r *http.Request) (*events.SQ
 
 // Deserialize does deserialize SQS Message as http.Request.
 func (s *Serializer) Deserialize(ctx context.Context, message events.SQSMessage) (*http.Request, error) {
-	sr := &JSONSerializableRequest{}
+	sr := &jsonSerializableRequest{}
 	if err := json.Unmarshal([]byte(message.Body), sr); err != nil {
 		return nil, fmt.Errorf("failed to unmarshal request: %w", err)
 	}
