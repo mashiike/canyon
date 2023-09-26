@@ -1,5 +1,9 @@
 # Changelog
 
+## [v0.4.0](https://github.com/mashiike/canyon/compare/v0.3.1...v0.4.0) - 2023-09-26
+- fallback handler can send sqs message by @mashiike in https://github.com/mashiike/canyon/pull/19
+- WithSerializer option by @mashiike in https://github.com/mashiike/canyon/pull/25
+
 ## [v0.3.1](https://github.com/mashiike/canyon/compare/v0.3.0...v0.3.1) - 2023-09-09
 - fix Lambda fallback  by @mashiike in https://github.com/mashiike/canyon/pull/15
 - on Lambda Runtime: if use in memory queue,sync processing by @mashiike in https://github.com/mashiike/canyon/pull/17
