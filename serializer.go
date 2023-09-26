@@ -14,11 +14,10 @@ import (
 	"github.com/aws/aws-lambda-go/events"
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/sqs"
-	"github.com/aws/aws-sdk-go-v2/service/sqs/types"
 )
 
 type Serializer interface {
-	Serialize(ctx context.Context, r *http.Request) (*events.SQSMessage, error)
+	Serialize(ctx context.Context, r *http.Request) (*sqs.SendMessageInput, error)
 	Deserialize(ctx context.Context, message *events.SQSMessage) (*http.Request, error)
 }
 
@@ -77,7 +76,7 @@ func (s *DefaultSerializer) Clone() *DefaultSerializer {
 }
 
 // Serialize does serialize http.Request as SQS Message.
-func (s *DefaultSerializer) Serialize(ctx context.Context, r *http.Request) (*events.SQSMessage, error) {
+func (s *DefaultSerializer) Serialize(ctx context.Context, r *http.Request) (*sqs.SendMessageInput, error) {
 	sr := &jsonSerializableRequest{
 		Method:        r.Method,
 		Header:        r.Header,
@@ -105,8 +104,8 @@ func (s *DefaultSerializer) Serialize(ctx context.Context, r *http.Request) (*ev
 	if err != nil {
 		return nil, fmt.Errorf("failed to marshal request: %w", err)
 	}
-	msg := &events.SQSMessage{
-		Body: string(bs),
+	msg := &sqs.SendMessageInput{
+		MessageBody: aws.String(string(bs)),
 	}
 	return msg, nil
 }
@@ -149,37 +148,4 @@ func (s *DefaultSerializer) Deserialize(ctx context.Context, message *events.SQS
 	}
 	r = SetSQSMessageHeader(r, message)
 	return r, nil
-}
-
-// newSendMessageInput does create SendMessageInput from http.Request.
-func newSendMessageInput(ctx context.Context, s Serializer, sqsQueueURL string, r *http.Request, messageAttrs map[string]types.MessageAttributeValue) (*sqs.SendMessageInput, error) {
-	msg, err := s.Serialize(ctx, r)
-	if err != nil {
-		return nil, fmt.Errorf("failed to serialize request: %w", err)
-	}
-	attrs := make(map[string]types.MessageAttributeValue, len(messageAttrs)+len(msg.MessageAttributes))
-	for k, v := range msg.MessageAttributes {
-		attrs[k] = types.MessageAttributeValue{
-			DataType:         aws.String(v.DataType),
-			BinaryValue:      v.BinaryValue,
-			StringValue:      v.StringValue,
-			BinaryListValues: v.BinaryListValues,
-			StringListValues: v.StringListValues,
-		}
-	}
-	for k, v := range messageAttrs {
-		attrs[k] = types.MessageAttributeValue{
-			DataType:         v.DataType,
-			BinaryValue:      v.BinaryValue,
-			StringValue:      v.StringValue,
-			BinaryListValues: v.BinaryListValues,
-			StringListValues: v.StringListValues,
-		}
-	}
-	params := &sqs.SendMessageInput{
-		MessageBody:       aws.String(msg.Body),
-		QueueUrl:          aws.String(sqsQueueURL),
-		MessageAttributes: attrs,
-	}
-	return params, nil
 }

@@ -436,10 +436,11 @@ func newWorkerSender(mux http.Handler, serializer Serializer, c *runOptions) Wor
 				l.DebugContext(r.Context(), "try sqs send message with http request", "method", r.Method, "path", r.URL.Path)
 			}
 			ctx := r.Context()
-			input, err := newSendMessageInput(ctx, serializer, queueURL, r, nil)
+			input, err := serializer.Serialize(ctx, r)
 			if err != nil {
-				return "", fmt.Errorf("failed to create sqs message: %w", err)
+				return "", fmt.Errorf("failed to serialize request: %w", err)
 			}
+			input.QueueUrl = aws.String(queueURL)
 			if opts != nil {
 				if len(opts.MessageAttributes) > 0 {
 					if input.MessageAttributes == nil {
