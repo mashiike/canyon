@@ -4,8 +4,6 @@ import (
 	"context"
 	"log/slog"
 	"net/http"
-
-	"github.com/aws/aws-sdk-go-v2/service/sqs/types"
 )
 
 type contextKey string
@@ -33,23 +31,6 @@ func Logger(r *http.Request) *slog.Logger {
 
 func embedLoggerInContext(ctx context.Context, logger *slog.Logger) context.Context {
 	return context.WithValue(ctx, contextKeyLogger, logger)
-}
-
-// MessageAttributes is a map of sqs message attributes.
-type MessageAttributes map[string]types.MessageAttributeValue
-
-// WorkerSender is a interface for sending sqs message.
-// for testing, not for production use.
-type WorkerSender interface {
-	SendToWorker(r *http.Request, attributes MessageAttributes) (string, error)
-}
-
-// WorkerSenderFunc is a func type for sending sqs message.
-// for testing, not for production use.
-type WorkerSenderFunc func(*http.Request, MessageAttributes) (string, error)
-
-func (f WorkerSenderFunc) SendToWorker(r *http.Request, attributes MessageAttributes) (string, error) {
-	return f(r, attributes)
 }
 
 func workerSenderFromContext(ctx context.Context) WorkerSender {
