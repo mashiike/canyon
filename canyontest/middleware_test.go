@@ -25,7 +25,7 @@ func TestAsServer(t *testing.T) {
 			require.Equal(t, "message-id", msgId, "should return message id")
 			w.WriteHeader(http.StatusOK)
 		}),
-		canyon.SQSMessageSenderFunc(func(r *http.Request, _ canyon.MessageAttributes) (string, error) {
+		canyon.WorkerSenderFunc(func(r *http.Request, _ canyon.MessageAttributes) (string, error) {
 			require.Equal(t, "POST", r.Method)
 			require.Equal(t, "/", r.URL.Path)
 			return "message-id", nil
@@ -68,7 +68,7 @@ func TestAsLambdaFallbak(t *testing.T) {
 			require.Equal(t, "message-id", messageID, "should return message id")
 			return nil
 		}),
-		canyon.SQSMessageSenderFunc(func(r *http.Request, _ canyon.MessageAttributes) (string, error) {
+		canyon.WorkerSenderFunc(func(r *http.Request, _ canyon.MessageAttributes) (string, error) {
 			require.Equal(t, "POST", r.Method)
 			require.Equal(t, "/", r.URL.Path)
 			json.NewDecoder(r.Body).Decode(&lastSend)

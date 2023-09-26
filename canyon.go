@@ -378,12 +378,12 @@ func newServerHandler(mux http.Handler, c *runOptions) http.Handler {
 	if s, ok := serializer.(LoggingableSerializer); ok && c.logVarbose {
 		serializer = s.WithLogger(logger)
 	}
-	sender := newSQSMessageSender(mux, serializer, c)
+	sender := newWorkerSender(mux, serializer, c)
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		ctx := r.Context()
 		ctx = embedLoggerInContext(ctx, logger)
 		ctx = EmbedIsWorkerInContext(ctx, false)
-		ctx = EmbedSQSMessageSenderInContext(ctx, sender)
+		ctx = EmbedWorkerSenderInContext(ctx, sender)
 		mux.ServeHTTP(w, r.WithContext(ctx))
 	})
 }
@@ -405,18 +405,18 @@ func newLambdaFallbackHandler(mux http.Handler, c *runOptions) lambda.Handler {
 	if s, ok := serializer.(LoggingableSerializer); ok && c.logVarbose {
 		serializer = s.WithLogger(logger)
 	}
-	sender := newSQSMessageSender(mux, serializer, c)
+	sender := newWorkerSender(mux, serializer, c)
 	return LambdaHandlerFunc(func(ctx context.Context, event []byte) ([]byte, error) {
 		ctx = embedLoggerInContext(ctx, logger)
 		ctx = EmbedIsWorkerInContext(ctx, false)
-		ctx = EmbedSQSMessageSenderInContext(ctx, sender)
+		ctx = EmbedWorkerSenderInContext(ctx, sender)
 		return c.lambdaFallbackHandler.Invoke(ctx, event)
 	})
 }
 
-func newSQSMessageSender(mux http.Handler, serializer Serializer, c *runOptions) SQSMessageSender {
+func newWorkerSender(mux http.Handler, serializer Serializer, c *runOptions) WorkerSender {
 	if isLambda() && c.useInMemorySQS {
-		return SQSMessageSenderFunc(func(r *http.Request, m MessageAttributes) (string, error) {
+		return WorkerSenderFunc(func(r *http.Request, m MessageAttributes) (string, error) {
 			// recoall mux as worker
 			ctx := EmbedIsWorkerInContext(r.Context(), true)
 			w := NewWorkerResponseWriter()
@@ -428,7 +428,7 @@ func newSQSMessageSender(mux http.Handler, serializer Serializer, c *runOptions)
 			return "in-memory-message", nil
 		})
 	} else {
-		return SQSMessageSenderFunc(func(r *http.Request, m MessageAttributes) (string, error) {
+		return WorkerSenderFunc(func(r *http.Request, m MessageAttributes) (string, error) {
 			queueURL, client := c.SQSClientAndQueueURL()
 			l := Logger(r)
 			if c.logVarbose {
@@ -452,9 +452,9 @@ func newSQSMessageSender(mux http.Handler, serializer Serializer, c *runOptions)
 }
 
 func SendToWorker(r *http.Request, messageAttrs map[string]types.MessageAttributeValue) (string, error) {
-	sqsMessageSender := sqsMessageSenderFromContext(r.Context())
-	if sqsMessageSender == nil {
+	workerSender := workerSenderFromContext(r.Context())
+	if workerSender == nil {
 		return "", errors.New("sqs message sender is not set: may be worker or not running with canyon")
 	}
-	return sqsMessageSender.SendMessage(r, messageAttrs)
+	return workerSender.SendToWorker(r, messageAttrs)
 }

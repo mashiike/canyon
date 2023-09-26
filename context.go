@@ -11,9 +11,9 @@ import (
 type contextKey string
 
 var (
-	contextKeyLogger           = contextKey("logger")
-	contextKeySQSMessageSender = contextKey("sqs-message-sender")
-	contextKeyIsWorker         = contextKey("is-worker")
+	contextKeyLogger       = contextKey("logger")
+	contextKeyWorkerSender = contextKey("sqs-message-sender")
+	contextKeyIsWorker     = contextKey("is-worker")
 )
 
 // Logger returns slog.Logger with component attribute.
@@ -38,32 +38,32 @@ func embedLoggerInContext(ctx context.Context, logger *slog.Logger) context.Cont
 // MessageAttributes is a map of sqs message attributes.
 type MessageAttributes map[string]types.MessageAttributeValue
 
-// SQSMessageSender is a interface for sending sqs message.
+// WorkerSender is a interface for sending sqs message.
 // for testing, not for production use.
-type SQSMessageSender interface {
-	SendMessage(r *http.Request, attributes MessageAttributes) (string, error)
+type WorkerSender interface {
+	SendToWorker(r *http.Request, attributes MessageAttributes) (string, error)
 }
 
-// SQSMessageSenderFunc is a func type for sending sqs message.
+// WorkerSenderFunc is a func type for sending sqs message.
 // for testing, not for production use.
-type SQSMessageSenderFunc func(*http.Request, MessageAttributes) (string, error)
+type WorkerSenderFunc func(*http.Request, MessageAttributes) (string, error)
 
-func (f SQSMessageSenderFunc) SendMessage(r *http.Request, attributes MessageAttributes) (string, error) {
+func (f WorkerSenderFunc) SendToWorker(r *http.Request, attributes MessageAttributes) (string, error) {
 	return f(r, attributes)
 }
 
-func sqsMessageSenderFromContext(ctx context.Context) SQSMessageSender {
-	sender, ok := ctx.Value(contextKeySQSMessageSender).(SQSMessageSender)
+func workerSenderFromContext(ctx context.Context) WorkerSender {
+	sender, ok := ctx.Value(contextKeyWorkerSender).(WorkerSender)
 	if !ok {
 		return nil
 	}
 	return sender
 }
 
-// EmbedSQSMessageSenderInContext embeds SQSMessageSender in context.
+// EmbedWorkerSenderInContext embeds WorkerSender in context.
 // for testing, not for production use.
-func EmbedSQSMessageSenderInContext(ctx context.Context, sender SQSMessageSender) context.Context {
-	return context.WithValue(ctx, contextKeySQSMessageSender, sender)
+func EmbedWorkerSenderInContext(ctx context.Context, sender WorkerSender) context.Context {
+	return context.WithValue(ctx, contextKeyWorkerSender, sender)
 }
 
 // IsWorker returns true if the request is from worker.
