@@ -17,6 +17,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/Songmu/flextime"
 	"github.com/aws/aws-lambda-go/events"
 	"github.com/aws/aws-lambda-go/lambdacontext"
 	"github.com/aws/aws-sdk-go-v2/aws"
@@ -242,6 +243,7 @@ type inMemorySQSClient struct {
 	isProcessing             map[string]bool
 	approximateReceiveCount  map[string]int
 	processingStartTime      map[string]time.Time
+	receivableTime           map[string]time.Time
 	messageIDByReceiptHandle map[string]string
 	maxReceiveCount          int
 	visibilityTimeout        time.Duration
@@ -267,6 +269,9 @@ func (c *inMemorySQSClient) prepare() {
 		}
 		if c.messageIDByReceiptHandle == nil {
 			c.messageIDByReceiptHandle = make(map[string]string)
+		}
+		if c.receivableTime == nil {
+			c.receivableTime = make(map[string]time.Time)
 		}
 		if c.visibilityTimeout == 0 {
 			c.visibilityTimeout = 30 * time.Second
@@ -324,6 +329,11 @@ func (c *inMemorySQSClient) SendMessage(ctx context.Context, params *sqs.SendMes
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	c.messages[*msg.MessageId] = msg
+	receiveableTime := flextime.Now()
+	if params.DelaySeconds > 0 {
+		receiveableTime = receiveableTime.Add(time.Duration(params.DelaySeconds) * time.Second)
+	}
+	c.receivableTime[*msg.MessageId] = receiveableTime
 	c.logger.DebugContext(ctx, "enqueue to on memory queue", "current_queue_size", len(c.messages), "enqueued_message_id", *msg.MessageId)
 	return &sqs.SendMessageOutput{
 		MessageId: msg.MessageId,

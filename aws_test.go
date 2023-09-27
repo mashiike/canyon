@@ -13,6 +13,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/Songmu/flextime"
 	"github.com/aws/aws-lambda-go/events"
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/config"
@@ -86,6 +87,83 @@ func TestInMemorySQSClient(t *testing.T) {
 		ReceiptHandle: &receiptHandle,
 	})
 	require.NoError(t, err, "should delete message")
+}
+
+func TestInMemorySQSClient__DelaySeconds(t *testing.T) {
+	restore := flextime.Set(time.Date(2023, 1, 1, 0, 0, 0, 0, time.UTC))
+	defer restore()
+	var logs bytes.Buffer
+	t.Cleanup(func() {
+		t.Log("Logs\n", logs.String())
+	})
+	inMemorySQSClient := &inMemorySQSClient{
+		visibilityTimeout: time.Second,
+		logger:            slog.New(slog.NewJSONHandler(&logs, &slog.HandlerOptions{Level: slog.LevelDebug})),
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	getQueueURLResult, err := inMemorySQSClient.GetQueueUrl(ctx, &sqs.GetQueueUrlInput{
+		QueueName: aws.String("test-queue"),
+	})
+	require.NoError(t, err, "should get queue url")
+	require.Equal(t, "https://sqs.ap-northeast-1.amazonaws.com/123456789012/test-queue", *getQueueURLResult.QueueUrl, "should get queue url")
+
+	setSendMessage := func(delaySeconds int32) string {
+		sendMessageResult, err := inMemorySQSClient.SendMessage(ctx, &sqs.SendMessageInput{
+			QueueUrl:    getQueueURLResult.QueueUrl,
+			MessageBody: aws.String(`{"foo":"bar baz"}`),
+			MessageAttributes: map[string]types.MessageAttributeValue{
+				"foo": {
+					DataType:    aws.String("String"),
+					StringValue: aws.String("bar baz"),
+				},
+				"number": {
+					DataType:    aws.String("Number"),
+					StringValue: aws.String("123"),
+				},
+				"binary": {
+					DataType:    aws.String("Binary"),
+					BinaryValue: []byte("binary"),
+				},
+			},
+			DelaySeconds: delaySeconds,
+		})
+		require.NoError(t, err, "should send message")
+		require.NotEmpty(t, sendMessageResult.MessageId, "should have message id")
+		return *sendMessageResult.MessageId
+	}
+
+	nonDelayMessageID := setSendMessage(0)
+	delayMessageID := setSendMessage(900)
+	require.Equal(t, 2, inMemorySQSClient.MessageCount(), "should have 1 message in fake sqs client")
+
+	reciveMessage := func() string {
+		ctx, cancel := context.WithTimeout(context.Background(), 1*time.Second)
+		defer cancel()
+		receiveMessageResult, err := inMemorySQSClient.ReceiveMessage(ctx, &sqs.ReceiveMessageInput{
+			QueueUrl:            getQueueURLResult.QueueUrl,
+			MaxNumberOfMessages: 1,
+			VisibilityTimeout:   3,
+			WaitTimeSeconds:     20,
+		})
+		require.NoError(t, err, "should receive message")
+		require.Equal(t, 1, len(receiveMessageResult.Messages), "should have 1 message")
+		require.Equal(t, `{"foo":"bar baz"}`, *receiveMessageResult.Messages[0].Body, "should have message body")
+		receiptHandle := *receiveMessageResult.Messages[0].ReceiptHandle
+		messageID := *receiveMessageResult.Messages[0].MessageId
+		require.NotEmpty(t, receiptHandle, "should have receipt handle")
+		_, err = inMemorySQSClient.DeleteMessage(ctx, &sqs.DeleteMessageInput{
+			QueueUrl:      getQueueURLResult.QueueUrl,
+			ReceiptHandle: &receiptHandle,
+		})
+		require.NoError(t, err, "should delete message")
+		return messageID
+	}
+	actualFirstMessageID := reciveMessage()
+	require.Equal(t, nonDelayMessageID, actualFirstMessageID, "should receive non delay message first")
+	flextime.Set(time.Date(2023, 1, 1, 0, 30, 0, 0, time.UTC))
+	actualSecondMessageID := reciveMessage()
+	require.Equal(t, delayMessageID, actualSecondMessageID, "should receive delay message second")
 }
 
 func TestSQSLongPollingService__WithinMemorySQS(t *testing.T) {
