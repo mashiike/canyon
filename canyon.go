@@ -466,6 +466,9 @@ func newWorkerSender(mux http.Handler, serializer Serializer, c *runOptions) Wor
 				if opts.MessageGroupID != nil {
 					input.MessageGroupId = opts.MessageGroupID
 				}
+				if opts.DelaySeconds != nil {
+					input.DelaySeconds = *opts.DelaySeconds
+				}
 			}
 			output, err := client.SendMessage(ctx, input)
 			if err != nil {
@@ -477,12 +480,4 @@ func newWorkerSender(mux http.Handler, serializer Serializer, c *runOptions) Wor
 			return *output.MessageId, nil
 		})
 	}
-}
-
-func SendToWorker(r *http.Request, opts *SendOptions) (string, error) {
-	workerSender := workerSenderFromContext(r.Context())
-	if workerSender == nil {
-		return "", errors.New("sqs message sender is not set: may be worker or not running with canyon")
-	}
-	return workerSender.SendToWorker(r, opts)
 }
