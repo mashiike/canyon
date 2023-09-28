@@ -18,7 +18,11 @@ func main() {
 	slog.SetDefault(slog.New(slog.NewJSONHandler(os.Stderr, &slog.HandlerOptions{Level: slog.LevelDebug})))
 	ctx, cancel := signal.NotifyContext(context.Background(), syscall.SIGTERM, syscall.SIGINT, syscall.SIGQUIT)
 	defer cancel()
-
+	s, err := canyon.NewEventBridgeScheduler(ctx, "canyon-example.")
+	if err != nil {
+		slog.Error("failed to create scheduler", "error", err)
+		os.Exit(1)
+	}
 	opts := []canyon.Option{
 		canyon.WithServerAddress(":8080", "/"),
 		canyon.WithCanyonEnv("CANYON_"), // environment variables prefix
@@ -26,8 +30,9 @@ func main() {
 			slog.Error("non SQS or HTTP event", "event", string(event))
 			return errors.New("invalid lambda payload")
 		}),
+		canyon.WithScheduler(s),
 	}
-	err := canyon.RunWithContext(ctx, "canyon-example", http.HandlerFunc(handler), opts...)
+	err = canyon.RunWithContext(ctx, "canyon-example", http.HandlerFunc(handler), opts...)
 	if err != nil {
 		slog.Error("failed to run canyon", "error", err)
 		os.Exit(1)

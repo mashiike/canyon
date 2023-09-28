@@ -27,6 +27,7 @@ import (
 	sdklambda "github.com/aws/aws-sdk-go-v2/service/lambda"
 	lambdatypes "github.com/aws/aws-sdk-go-v2/service/lambda/types"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
+	"github.com/aws/aws-sdk-go-v2/service/scheduler"
 	"github.com/aws/aws-sdk-go-v2/service/sqs"
 	"github.com/aws/aws-sdk-go-v2/service/sqs/types"
 	"github.com/google/uuid"
@@ -44,6 +45,10 @@ type S3Client interface {
 	manager.UploadAPIClient
 	manager.DownloadAPIClient
 	s3.HeadObjectAPIClient
+}
+
+type EventBridgeSchedulerClient interface {
+	CreateSchedule(ctx context.Context, params *scheduler.CreateScheduleInput, optFns ...func(*scheduler.Options)) (*scheduler.CreateScheduleOutput, error)
 }
 
 type sqsLongPollingService struct {

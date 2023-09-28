@@ -16,6 +16,7 @@ import (
 
 	"github.com/aws/aws-lambda-go/events"
 	"github.com/aws/aws-sdk-go-v2/aws"
+	"github.com/aws/aws-sdk-go-v2/aws/arn"
 )
 
 // camelCaseToKebabCase converts camelCase to kebab-case.
@@ -226,4 +227,32 @@ func parseURL(urlStr string) (*url.URL, error) {
 
 func isLambda() bool {
 	return strings.HasPrefix(os.Getenv("AWS_EXECUTION_ENV"), "AWS_Lambda") || os.Getenv("AWS_LAMBDA_RUNTIME_API") != ""
+}
+
+// sqsQueueURLToArn converts SQS Queue URL to SQS Queue ARN.
+// example: https://sqs.ap-northeast-1.amazonaws.com/123456789012/test-queue => arn:aws:sqs:ap-northeast-1:123456789012:test-queue
+func sqsQueueURLToArn(rawURL string) (string, error) {
+	u, err := url.Parse(rawURL)
+	if err != nil {
+		return "", err
+	}
+	if u.Scheme != "https" {
+		return "", fmt.Errorf("invalid scheme: %s", u.Scheme)
+	}
+	if !strings.HasPrefix(u.Host, "sqs.") || !strings.HasSuffix(u.Host, ".amazonaws.com") {
+		return "", fmt.Errorf("invalid host: %s", u.Host)
+	}
+	region := strings.TrimSuffix(strings.TrimPrefix(u.Host, "sqs."), ".amazonaws.com")
+	parts := strings.Split(u.Path, "/")
+	if len(parts) != 3 {
+		return "", fmt.Errorf("invalid path: %s", u.Path)
+	}
+	arnStr := arn.ARN{
+		Partition: "aws",
+		Service:   "sqs",
+		Region:    region,
+		AccountID: parts[1],
+		Resource:  parts[2],
+	}.String()
+	return arnStr, nil
 }

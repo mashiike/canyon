@@ -422,6 +422,8 @@ func newLambdaFallbackHandler(mux http.Handler, c *runOptions) lambda.Handler {
 	})
 }
 
+const DelayedSQSMessageID = "<delayed sqs message>"
+
 func newWorkerSender(mux http.Handler, serializer Serializer, c *runOptions) WorkerSender {
 	if isLambda() && c.useInMemorySQS {
 		return WorkerSenderFunc(func(r *http.Request, opts *SendOptions) (string, error) {
@@ -482,6 +484,7 @@ func newWorkerSender(mux http.Handler, serializer Serializer, c *runOptions) Wor
 				if err := c.scheduler.RegisterSchedule(ctx, input); err != nil {
 					return "", fmt.Errorf("failed to register to scheduler: %w", err)
 				}
+				return DelayedSQSMessageID, nil
 			}
 			output, err := client.SendMessage(ctx, input)
 			if err != nil {

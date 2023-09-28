@@ -10,7 +10,10 @@ resource "aws_iam_role" "canyon_example" {
         Effect = "Allow"
         Sid    = ""
         Principal = {
-          Service = "lambda.amazonaws.com"
+          Service = [
+            "lambda.amazonaws.com",
+            "scheduler.amazonaws.com",
+          ]
         }
       }
     ]
@@ -81,6 +84,21 @@ data "aws_iam_policy_document" "canyon_example" {
       "logs:PutLogEvents",
     ]
     resources = ["*"]
+  }
+  // for use schedler
+  statement {
+    actions = [
+      "scheduler:CreateSchedule",
+    ]
+    resources = ["*"]
+  }
+  statement {
+    actions = [
+      "iam:PassRole",
+    ]
+    resources = [
+      aws_iam_role.canyon_example.arn,
+    ]
   }
 }
 
