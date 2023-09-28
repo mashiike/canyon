@@ -57,6 +57,25 @@ type sqsLongPollingService struct {
 
 type sqsEventLambdaHandlerFunc func(context.Context, *events.SQSEvent) (*events.SQSEventResponse, error)
 
+func getVisibilityTimeout(ctx context.Context, queueURL string, sqsClient SQSClient) (int64, error) {
+	getAttributes, err := sqsClient.GetQueueAttributes(ctx, &sqs.GetQueueAttributesInput{
+		QueueUrl:       aws.String(queueURL),
+		AttributeNames: []types.QueueAttributeName{"VisibilityTimeout"},
+	})
+	if err != nil {
+		return 0, fmt.Errorf("can not get queue attributes: %w", err)
+	}
+	visibilityTimeoutStr, ok := getAttributes.Attributes["VisibilityTimeout"]
+	if !ok {
+		return 30, nil
+	}
+	visibilityTimeout, err := strconv.ParseInt(visibilityTimeoutStr, 10, 32)
+	if err != nil {
+		return 0, fmt.Errorf("invalid visibility timeout: %w", err)
+	}
+	return visibilityTimeout, nil
+}
+
 func (svc *sqsLongPollingService) Start(ctx context.Context, fn sqsEventLambdaHandlerFunc) error {
 	if svc.maxNumberObMessages < 0 {
 		svc.maxNumberObMessages = 1
@@ -74,22 +93,9 @@ func (svc *sqsLongPollingService) Start(ctx context.Context, fn sqsEventLambdaHa
 	if err != nil {
 		return fmt.Errorf("invalid queue url: %w", err)
 	}
-	getAttributes, err := svc.sqsClient.GetQueueAttributes(ctx, &sqs.GetQueueAttributesInput{
-		QueueUrl:       aws.String(svc.queueURL),
-		AttributeNames: []types.QueueAttributeName{"VisibilityTimeout"},
-	})
+	visibilityTimeout, err := getVisibilityTimeout(ctx, svc.queueURL, svc.sqsClient)
 	if err != nil {
-		return fmt.Errorf("can not get queue attributes: %w", err)
-	}
-	visibilityTimeoutStr, ok := getAttributes.Attributes["VisibilityTimeout"]
-	var visibilityTimeout int64
-	if !ok {
-		visibilityTimeout = 30
-	} else {
-		visibilityTimeout, err = strconv.ParseInt(visibilityTimeoutStr, 10, 32)
-		if err != nil {
-			return fmt.Errorf("invalid visibility timeout: %w", err)
-		}
+		return fmt.Errorf("can not get visibility timeout: %w", err)
 	}
 	arnObj, err := convertQueueURLToARN(urlObj)
 	if err != nil {
