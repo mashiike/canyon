@@ -3,12 +3,14 @@ module github.com/mashiike/canyon
 go 1.21.0
 
 require (
+	github.com/Songmu/flextime v0.1.0
 	github.com/aws/aws-lambda-go v1.41.0
 	github.com/aws/aws-sdk-go-v2 v1.21.0
 	github.com/aws/aws-sdk-go-v2/config v1.18.42
 	github.com/aws/aws-sdk-go-v2/feature/s3/manager v1.11.86
 	github.com/aws/aws-sdk-go-v2/service/lambda v1.39.5
 	github.com/aws/aws-sdk-go-v2/service/s3 v1.39.0
+	github.com/aws/aws-sdk-go-v2/service/scheduler v1.3.0
 	github.com/aws/aws-sdk-go-v2/service/sqs v1.24.5
 	github.com/fujiwara/ridge v0.6.1
 	github.com/google/uuid v1.3.1

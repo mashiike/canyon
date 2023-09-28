@@ -253,6 +253,35 @@ fallback handler called: {"foo":"bar"}
 <... continue program ...>
 ```
 
+### Long Delayed Message with EventBridge Scheduler
+
+SQS Delayed Message is max 15 minutes. if you want to more long delayed message, use EventBridge Scheduler.
+if more long delay, CreateSchedule API call with at expression.
+
+```go
+package main
+
+//...
+
+func main() {
+//...
+    scheduler, err := canyon.NewEventBridgeScheduler(ctx, "schedule-name-prefix.")
+    if err != nil {
+        slog.Error("failed to create eventbridge scheduler", "error", err)
+        os.Exit(1)
+    }
+    opts := []canyon.Option{
+        canyon.WithServerAddress(":8080", "/"),
+        canyon.WitScheduler(scheduler),
+    }
+    err := canyon.RunWithContext(ctx, "your-sqs-queue-name", http.HandlerFunc(handler), opts...)
+    if err != nil {
+        slog.Error("failed to run canyon", "error", err)
+        os.Exit(1)
+    }
+}
+```
+if use `canyon.CanyonEnv` option, `<env prefix>SCHEDULER` environment variable is set `true`, use EventBridge Scheduler.
 
 ## For testing  
 

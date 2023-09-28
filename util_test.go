@@ -88,3 +88,17 @@ func TestParseURL(t *testing.T) {
 		require.Equal(t, c[3], u.Path, "should have path")
 	}
 }
+
+func TestSQSQueueURLToArn(t *testing.T) {
+	cases := [][]string{
+		{"https://sqs.ap-northeast-1.amazonaws.com/123456789012/MyQueue", "arn:aws:sqs:ap-northeast-1:123456789012:MyQueue"},
+		{"https://sqs.ap-northeast-1.amazonaws.com/123456789012/YourQueue", "arn:aws:sqs:ap-northeast-1:123456789012:YourQueue"},
+		{"https://sqs.ap-northeast-1.amazonaws.com/123456789012/MyQueue.fifo", "arn:aws:sqs:ap-northeast-1:123456789012:MyQueue.fifo"},
+		{"https://sqs.us-east-1.amazonaws.com/123456789012/YourQueue.fifo", "arn:aws:sqs:us-east-1:123456789012:YourQueue.fifo"},
+	}
+	for _, c := range cases {
+		arnStr, err := sqsQueueURLToArn(c[0])
+		require.NoError(t, err, "should parse url")
+		require.Equal(t, c[1], arnStr, "should have arn")
+	}
+}

@@ -65,6 +65,7 @@ type runOptions struct {
 	lambdaFallbackHandler              lambda.Handler
 	stdin                              io.Reader
 	serializer                         Serializer
+	scheduler                          Scheduler
 }
 
 func defaultRunConfig(cancel context.CancelCauseFunc, sqsQueueName string) *runOptions {
@@ -311,6 +312,10 @@ func WithCanyonEnv(envPrefix string) Option {
 			envPrefix = "CANYON_"
 		}
 		env := os.Getenv(envPrefix + "ENV")
+		var useScheduler bool
+		if str := os.Getenv(envPrefix + "SCHEDULER"); strings.EqualFold(str, "true") {
+			useScheduler = true
+		}
 		switch strings.ToLower(env) {
 		case "development":
 			WithVarbose()(c)
@@ -344,9 +349,21 @@ func WithCanyonEnv(envPrefix string) Option {
 				return
 			}
 			WithBackend(b)(c)
+			if useScheduler {
+				WithScheduler(NewInMemoryScheduler(func() SQSClient {
+					_, sqsClient := c.SQSClientAndQueueURL()
+					return sqsClient
+				}))(c)
+			}
 		case "test":
 			WithInMemoryQueue(30*time.Second, 3, nil)(c)
 			WithBackend(NewInMemoryBackend())(c)
+			if useScheduler {
+				WithScheduler(NewInMemoryScheduler(func() SQSClient {
+					_, sqsClient := c.SQSClientAndQueueURL()
+					return sqsClient
+				}))(c)
+			}
 		default:
 			env = "production"
 			if urlStr := os.Getenv(envPrefix + "BACKEND_URL"); urlStr != "" {
@@ -366,6 +383,21 @@ func WithCanyonEnv(envPrefix string) Option {
 					}
 				}
 				WithBackend(b)(c)
+			}
+			if useScheduler {
+				scheduleNamePrefix := "canyon."
+				if str := os.Getenv(envPrefix + "SCHEDULE_NAME_PREFIX"); str != "" {
+					scheduleNamePrefix = str
+				}
+				s, err := NewEventBridgeScheduler(context.Background(), scheduleNamePrefix)
+				if err != nil {
+					c.cancel(fmt.Errorf("create eventbridge scheduler: %w", err))
+					return
+				}
+				if groupName := os.Getenv(envPrefix + "SCHEDULE_GROUP_NAME"); groupName != "" {
+					s.SetGroupName(groupName)
+				}
+				WithScheduler(s)(c)
 			}
 		}
 		c.logger.Info("running canyon", "env", env)
@@ -395,5 +427,11 @@ func WithStdin(stdin io.Reader) Option {
 func WithSerializer(serializer Serializer) Option {
 	return func(c *runOptions) {
 		c.serializer = serializer
+	}
+}
+
+func WithScheduler(scheduler Scheduler) Option {
+	return func(c *runOptions) {
+		c.scheduler = scheduler
 	}
 }

@@ -422,6 +422,8 @@ func newLambdaFallbackHandler(mux http.Handler, c *runOptions) lambda.Handler {
 	})
 }
 
+const DelayedSQSMessageID = "<delayed sqs message>"
+
 func newWorkerSender(mux http.Handler, serializer Serializer, c *runOptions) WorkerSender {
 	if isLambda() && c.useInMemorySQS {
 		return WorkerSenderFunc(func(r *http.Request, opts *SendOptions) (string, error) {
@@ -466,6 +468,23 @@ func newWorkerSender(mux http.Handler, serializer Serializer, c *runOptions) Wor
 				if opts.MessageGroupID != nil {
 					input.MessageGroupId = opts.MessageGroupID
 				}
+				if opts.DelaySeconds != nil {
+					input.DelaySeconds = *opts.DelaySeconds
+				}
+			}
+			// https://docs.aws.amazon.com/AWSSimpleQueueService/latest/APIReference/API_SendMessage.html#SQS-SendMessage-request-DelaySeconds
+			// > Valid values: 0 to 900. Maximum: 15 minutes.
+			if input.DelaySeconds < 0 {
+				input.DelaySeconds = 0
+			}
+			if input.DelaySeconds > 900 {
+				if c.scheduler == nil {
+					return "", fmt.Errorf("delay_seconds is too long: if need long delay, scheduler is required")
+				}
+				if err := c.scheduler.RegisterSchedule(ctx, input); err != nil {
+					return "", fmt.Errorf("failed to register to scheduler: %w", err)
+				}
+				return DelayedSQSMessageID, nil
 			}
 			output, err := client.SendMessage(ctx, input)
 			if err != nil {
@@ -477,12 +496,4 @@ func newWorkerSender(mux http.Handler, serializer Serializer, c *runOptions) Wor
 			return *output.MessageId, nil
 		})
 	}
-}
-
-func SendToWorker(r *http.Request, opts *SendOptions) (string, error) {
-	workerSender := workerSenderFromContext(r.Context())
-	if workerSender == nil {
-		return "", errors.New("sqs message sender is not set: may be worker or not running with canyon")
-	}
-	return workerSender.SendToWorker(r, opts)
 }

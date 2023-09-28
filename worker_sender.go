@@ -1,6 +1,7 @@
 package canyon
 
 import (
+	"errors"
 	"net/http"
 )
 
@@ -20,6 +21,9 @@ type SendOptions struct {
 
 	// MessageGroupID is a message group id for sqs message.
 	MessageGroupID *string
+
+	// DelaySeconds is a delay seconds for sqs message.
+	DelaySeconds *int32
 }
 
 // WorkerSender is a interface for sending sqs message.
@@ -34,4 +38,12 @@ type WorkerSenderFunc func(*http.Request, *SendOptions) (string, error)
 
 func (f WorkerSenderFunc) SendToWorker(r *http.Request, opts *SendOptions) (string, error) {
 	return f(r, opts)
+}
+
+func SendToWorker(r *http.Request, opts *SendOptions) (string, error) {
+	workerSender := workerSenderFromContext(r.Context())
+	if workerSender == nil {
+		return "", errors.New("sqs message sender is not set: may be worker or not running with canyon")
+	}
+	return workerSender.SendToWorker(r, opts)
 }

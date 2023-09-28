@@ -18,7 +18,7 @@ func main() {
 	slog.SetDefault(slog.New(slog.NewJSONHandler(os.Stderr, &slog.HandlerOptions{Level: slog.LevelDebug})))
 	ctx, cancel := signal.NotifyContext(context.Background(), syscall.SIGTERM, syscall.SIGINT, syscall.SIGQUIT)
 	defer cancel()
-
+	os.Setenv("CANYON_SCHEDULER", "true")
 	opts := []canyon.Option{
 		canyon.WithServerAddress(":8080", "/"),
 		canyon.WithCanyonEnv("CANYON_"), // environment variables prefix
