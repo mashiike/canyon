@@ -23,6 +23,10 @@ type Scheduler interface {
 	RegisterSchedule(ctx context.Context, msg *sqs.SendMessageInput) error
 }
 
+type EventBridgeSchedulerClient interface {
+	CreateSchedule(ctx context.Context, params *scheduler.CreateScheduleInput, optFns ...func(*scheduler.Options)) (*scheduler.CreateScheduleOutput, error)
+}
+
 type EventBridgeScheduler struct {
 	mu         sync.Mutex
 	iamRoleARN string
@@ -144,5 +148,33 @@ func (s *EventBridgeScheduler) RegisterSchedule(ctx context.Context, msg *sqs.Se
 		return fmt.Errorf("failed to create schedule: %w", err)
 	}
 	slog.InfoContext(ctx, "create schedule", "name", name, "scheduled_at", scheduledAt, "arn", *output.ScheduleArn)
+	return nil
+}
+
+type InMemoryScheduler struct {
+	clientFunc func() SQSClient
+}
+
+func NewInMemoryScheduler(clientFunc func() SQSClient) *InMemoryScheduler {
+	return &InMemoryScheduler{
+		clientFunc: clientFunc,
+	}
+}
+
+func (s *InMemoryScheduler) RegisterSchedule(ctx context.Context, msg *sqs.SendMessageInput) error {
+	now := flextime.Now()
+	id := uuid.New().String()
+	go func() {
+		timer := time.NewTimer(time.Duration(msg.DelaySeconds) * time.Second)
+		defer timer.Stop()
+		<-timer.C
+		output, err := s.clientFunc().SendMessage(ctx, msg)
+		if err != nil {
+			slog.ErrorContext(ctx, "failed to send message", "error", err, "scheduled_at", now.Add(time.Duration(msg.DelaySeconds)*time.Second), "schedule_id", id)
+			return
+		}
+		slog.InfoContext(ctx, "send message", "message_id", *output.MessageId, "scheduled_at", now.Add(time.Duration(msg.DelaySeconds)*time.Second), "schedule_id", id)
+	}()
+	slog.InfoContext(ctx, "register schedule", "scheduled_at", now.Add(time.Duration(msg.DelaySeconds)*time.Second), "schedule_id", id)
 	return nil
 }
