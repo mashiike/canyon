@@ -10,6 +10,7 @@ import (
 	"io"
 	"log/slog"
 	"net/http"
+	"strconv"
 
 	"github.com/aws/aws-lambda-go/events"
 	"github.com/aws/aws-sdk-go-v2/aws"
@@ -109,6 +110,13 @@ func (s *DefaultSerializer) Serialize(ctx context.Context, r *http.Request) (*sq
 	}
 	if str := r.Header.Get(HeaderSQSMessageGroupID); str != "" {
 		msg.MessageGroupId = aws.String(str)
+	}
+	if str := r.Header.Get(HeaderSQSMessageDelaySeconds); str != "" {
+		delaysSeconds, err := strconv.ParseInt(str, 10, 64)
+		if err != nil {
+			return nil, fmt.Errorf("failed to parse delay seconds: %w", err)
+		}
+		msg.DelaySeconds = int32(delaysSeconds)
 	}
 	return msg, nil
 }

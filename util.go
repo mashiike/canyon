@@ -59,6 +59,7 @@ func coalesce(strs ...*string) string {
 const (
 	HeaderSQSMessageID              = "Sqs-Message-Id"
 	HeaderSQSMessageGroupID         = "Sqs-Message-Group-Id"
+	HeaderSQSMessageDelaySeconds    = "Sqs-Message-Delay-Seconds"
 	HeaderSQSEventSource            = "Sqs-Event-Source"
 	HeaderSQSEventSourceArn         = "Sqs-Event-Source-Arn"
 	HeaderSQSAwsRegionHeader        = "Sqs-Aws-Region"
