@@ -1,5 +1,11 @@
 # Changelog
 
+## [v0.4.1](https://github.com/mashiike/canyon/compare/v0.4.0...v0.4.1) - 2023-09-28
+- change Serializer interface{} by @mashiike in https://github.com/mashiike/canyon/pull/26
+- Buckup RequestBody for Serializer, maybe read RequestBody on handler by @mashiike in https://github.com/mashiike/canyon/pull/28
+- delay seconds and Long delayed seconds with EventBridge Scheduler by @mashiike in https://github.com/mashiike/canyon/pull/29
+- Add graceful failure handling for SQSMessage VisibilityTimeout by @mashiike in https://github.com/mashiike/canyon/pull/30
+
 ## [v0.4.0](https://github.com/mashiike/canyon/compare/v0.3.1...v0.4.0) - 2023-09-26
 - fallback handler can send sqs message by @mashiike in https://github.com/mashiike/canyon/pull/19
 - WithSerializer option by @mashiike in https://github.com/mashiike/canyon/pull/25
