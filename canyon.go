@@ -19,6 +19,7 @@ import (
 	"github.com/aws/aws-lambda-go/lambda"
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/sqs/types"
+	"github.com/aws/smithy-go"
 	"github.com/fujiwara/ridge"
 	"github.com/mashiike/canyon/internal/jsonx"
 	"github.com/pires/go-proxyproto"
@@ -85,6 +86,7 @@ func runWithContext(ctx context.Context, mux http.Handler, c *runOptions) error 
 							checkFunctionResponseTypes(ctx, c)
 						})
 					}
+
 					resp, err := workerHandler(ctx, p.SQSEvent)
 					if err != nil {
 						return nil, err
@@ -325,13 +327,38 @@ func newWorkerHandler(mux http.Handler, c *runOptions) sqsEventLambdaHandlerFunc
 	if s, ok := serializer.(LoggingableSerializer); ok && c.logVarbose {
 		serializer = s.WithLogger(logger)
 	}
+	var once sync.Once
+	var visibilityTimeout time.Duration = -1 * time.Second
 	return func(ctx context.Context, event *events.SQSEvent) (*events.SQSEventResponse, error) {
+		once.Do(func() {
+			queueURL, client := c.SQSClientAndQueueURL()
+			vt, err := getVisibilityTimeout(ctx, queueURL, client)
+			if err != nil {
+				var ae smithy.APIError
+				if !errors.As(err, &ae) {
+					c.cancel(err)
+					return
+				}
+				if ae.ErrorCode() != "AccessDeniedException" {
+					return
+				}
+			}
+			visibilityTimeout = time.Duration(vt) * time.Second
+		})
 		var mu sync.Mutex
 		var wg sync.WaitGroup
 		var resp events.SQSEventResponse
+		if visibilityTimeout > c.workerTimeoutMergin {
+			var cancel context.CancelFunc
+			ctx, cancel = context.WithTimeout(ctx, visibilityTimeout-c.workerTimeoutMergin)
+			defer cancel()
+		}
+		messageIds := make([]string, 0, len(event.Records))
+		completed := make(map[string]bool, len(event.Records))
 		for _, record := range event.Records {
 			wg.Add(1)
 			_logger := logger.With(slog.String("message_id", record.MessageId))
+			messageIds = append(messageIds, record.MessageId)
 			go func(record events.SQSMessage) {
 				defer wg.Done()
 				w := NewWorkerResponseWriter()
@@ -346,6 +373,7 @@ func newWorkerHandler(mux http.Handler, c *runOptions) sqsEventLambdaHandlerFunc
 					resp.BatchItemFailures = append(resp.BatchItemFailures, events.SQSBatchItemFailure{
 						ItemIdentifier: record.MessageId,
 					})
+					completed[record.MessageId] = true
 					mu.Unlock()
 					return
 				}
@@ -363,12 +391,37 @@ func newWorkerHandler(mux http.Handler, c *runOptions) sqsEventLambdaHandlerFunc
 					resp.BatchItemFailures = append(resp.BatchItemFailures, events.SQSBatchItemFailure{
 						ItemIdentifier: record.MessageId,
 					})
+					completed[record.MessageId] = true
 					mu.Unlock()
+					return
 				}
-
+				mu.Lock()
+				completed[record.MessageId] = true
+				mu.Unlock()
 			}(record)
 		}
-		wg.Wait()
+		allDone := make(chan struct{})
+		go func() {
+			wg.Wait()
+			close(allDone)
+		}()
+		select {
+		case <-allDone:
+		case <-ctx.Done():
+			if errors.Is(ctx.Err(), context.DeadlineExceeded) || errors.Is(ctx.Err(), context.Canceled) {
+				logger.WarnContext(ctx, "worker timeout exceeded", "timeout", visibilityTimeout)
+				mu.Lock()
+				for _, id := range messageIds {
+					if completed[id] {
+						continue
+					}
+					resp.BatchItemFailures = append(resp.BatchItemFailures, events.SQSBatchItemFailure{
+						ItemIdentifier: id,
+					})
+				}
+				mu.Unlock()
+			}
+		}
 		return &resp, nil
 	}
 }

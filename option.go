@@ -66,6 +66,7 @@ type runOptions struct {
 	stdin                              io.Reader
 	serializer                         Serializer
 	scheduler                          Scheduler
+	workerTimeoutMergin                time.Duration
 }
 
 func defaultRunConfig(cancel context.CancelCauseFunc, sqsQueueName string) *runOptions {
@@ -88,6 +89,7 @@ func defaultRunConfig(cancel context.CancelCauseFunc, sqsQueueName string) *runO
 		lambdaFallbackHandler:              nil,
 		stdin:                              os.Stdin,
 		serializer:                         NewDefaultSerializer(),
+		workerTimeoutMergin:                1 * time.Second,
 	}
 	if cancel != nil {
 		c.cancel = cancel
@@ -430,8 +432,24 @@ func WithSerializer(serializer Serializer) Option {
 	}
 }
 
+// WithScheduler returns a new Option that sets the scheduler.
+// if set this option, canyon using scheduler.
+// when send to delayed second over 900 seconds sqs message, canyon create schedule.
 func WithScheduler(scheduler Scheduler) Option {
 	return func(c *runOptions) {
 		c.scheduler = scheduler
+	}
+}
+
+// WithWorkerTimeoutMergin returns a new Option that sets the worker timeout mergin.
+// if set this option, canyon worker timeout is visibility timeout - mergin.
+// default mergin is 1 second.
+// if visibility timeout is 30 seconds, worker timeout is 29 seconds.
+func WithWorkerTimeoutMergin(mergin time.Duration) Option {
+	return func(c *runOptions) {
+		if mergin < 0 {
+			mergin = 0
+		}
+		c.workerTimeoutMergin = mergin
 	}
 }
