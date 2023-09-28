@@ -470,6 +470,19 @@ func newWorkerSender(mux http.Handler, serializer Serializer, c *runOptions) Wor
 					input.DelaySeconds = *opts.DelaySeconds
 				}
 			}
+			// https://docs.aws.amazon.com/AWSSimpleQueueService/latest/APIReference/API_SendMessage.html#SQS-SendMessage-request-DelaySeconds
+			// > Valid values: 0 to 900. Maximum: 15 minutes.
+			if input.DelaySeconds < 0 {
+				input.DelaySeconds = 0
+			}
+			if input.DelaySeconds > 900 {
+				if c.scheduler == nil {
+					return "", fmt.Errorf("delay_seconds is too long: if need long delay, scheduler is required")
+				}
+				if err := c.scheduler.RegisterSchedule(ctx, input); err != nil {
+					return "", fmt.Errorf("failed to register to scheduler: %w", err)
+				}
+			}
 			output, err := client.SendMessage(ctx, input)
 			if err != nil {
 				return "", fmt.Errorf("failed to send sqs message: %w", err)

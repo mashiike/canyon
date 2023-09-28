@@ -65,6 +65,7 @@ type runOptions struct {
 	lambdaFallbackHandler              lambda.Handler
 	stdin                              io.Reader
 	serializer                         Serializer
+	scheduler                          Scheduler
 }
 
 func defaultRunConfig(cancel context.CancelCauseFunc, sqsQueueName string) *runOptions {
@@ -395,5 +396,11 @@ func WithStdin(stdin io.Reader) Option {
 func WithSerializer(serializer Serializer) Option {
 	return func(c *runOptions) {
 		c.serializer = serializer
+	}
+}
+
+func WithScheduler(scheduler Scheduler) Option {
+	return func(c *runOptions) {
+		c.scheduler = scheduler
 	}
 }
