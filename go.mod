@@ -12,6 +12,8 @@ require (
 	github.com/aws/aws-sdk-go-v2/service/s3 v1.39.0
 	github.com/aws/aws-sdk-go-v2/service/scheduler v1.3.0
 	github.com/aws/aws-sdk-go-v2/service/sqs v1.24.5
+	github.com/aws/aws-sdk-go-v2/service/sts v1.22.0
+	github.com/aws/smithy-go v1.14.2
 	github.com/fujiwara/ridge v0.6.1
 	github.com/google/uuid v1.3.1
 	github.com/pires/go-proxyproto v0.7.0
@@ -32,8 +34,6 @@ require (
 	github.com/aws/aws-sdk-go-v2/service/internal/s3shared v1.15.4 // indirect
 	github.com/aws/aws-sdk-go-v2/service/sso v1.14.1 // indirect
 	github.com/aws/aws-sdk-go-v2/service/ssooidc v1.17.1 // indirect
-	github.com/aws/aws-sdk-go-v2/service/sts v1.22.0 // indirect
-	github.com/aws/smithy-go v1.14.2 // indirect
 	github.com/davecgh/go-spew v1.1.1 // indirect
 	github.com/jmespath/go-jmespath v0.4.0 // indirect
 	github.com/pkg/errors v0.9.1 // indirect
