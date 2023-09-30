@@ -9,27 +9,78 @@ import (
 	"math/rand"
 	"mime"
 	"net/http"
+	"net/textproto"
 	"net/url"
 	"os"
 	"strings"
 	"time"
+	"unicode"
 
 	"github.com/aws/aws-lambda-go/events"
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/aws/arn"
+	"golang.org/x/text/cases"
+	"golang.org/x/text/language"
 )
+
+var commonInitialisms = map[string]bool{
+	"ACL":   true,
+	"API":   true,
+	"ASCII": true,
+	"AWS":   true,
+	"CPU":   true,
+	"CSS":   true,
+	"DNS":   true,
+	"EOF":   true,
+	"GUID":  true,
+	"HTML":  true,
+	"HTTP":  true,
+	"HTTPS": true,
+	"ID":    true,
+	"IP":    true,
+	"JSON":  true,
+	"LHS":   true,
+	"QPS":   true,
+	"RAM":   true,
+	"RHS":   true,
+	"RPC":   true,
+	"SLA":   true,
+	"SMTP":  true,
+	"SQL":   true,
+	"SSH":   true,
+	"TCP":   true,
+	"TLS":   true,
+	"TTL":   true,
+	"UDP":   true,
+	"UI":    true,
+	"UID":   true,
+	"UUID":  true,
+	"URI":   true,
+	"URL":   true,
+	"UTF8":  true,
+	"VM":    true,
+	"XML":   true,
+	"XSRF":  true,
+	"XSS":   true,
+}
 
 // camelCaseToKebabCase converts camelCase to kebab-case.
 // for example: ApproximateFirstReceiveTimestamp -> Approximate-First-Receive-Timestamp
 func camelCaseToKebabCase(s string) string {
 	var buf bytes.Buffer
 	for i, r := range s {
-		if i > 0 && 'A' <= r && r <= 'Z' {
-			buf.WriteByte('-')
+		if i == 0 {
+			buf.WriteRune(unicode.ToLower(r))
+		} else if unicode.IsUpper(r) {
+			if !unicode.IsUpper(rune(s[i-1])) || (i+1 < len(s) && !unicode.IsUpper(rune(s[i+1]))) {
+				buf.WriteByte('-')
+			}
+			buf.WriteRune(unicode.ToLower(r))
+		} else {
+			buf.WriteRune(r)
 		}
-		buf.WriteRune(r)
 	}
-	return buf.String()
+	return textproto.CanonicalMIMEHeaderKey(buf.String())
 }
 
 func kebabCaseToCamelCase(s string) string {
@@ -44,7 +95,12 @@ func kebabCaseToCamelCase(s string) string {
 		}
 		buf.WriteRune(r)
 	}
-	return buf.String()
+	camelCase := buf.String()
+	caser := cases.Title(language.English)
+	for initialism := range commonInitialisms {
+		camelCase = strings.ReplaceAll(camelCase, caser.String(strings.ToLower(initialism)), initialism)
+	}
+	return camelCase
 }
 
 func coalesce(strs ...*string) string {

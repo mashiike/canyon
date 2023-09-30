@@ -28,10 +28,14 @@ func ReadJSON[T any](t *testing.T, path string) *T {
 
 func TestCamelCaseToKebabCase(t *testing.T) {
 	require.Equal(t, "Foo-Bar-Baz", camelCaseToKebabCase("FooBarBaz"))
-	require.Equal(t, "foo-Bar-Baz", camelCaseToKebabCase("fooBarBaz"))
-	require.Equal(t, "foo-bar-baz", camelCaseToKebabCase("foo-bar-baz"))
-	require.Equal(t, "foo_bar_baz", camelCaseToKebabCase("foo_bar_baz"))
+	require.Equal(t, "Foo-Bar-Baz", camelCaseToKebabCase("fooBarBaz"))
+	require.Equal(t, "Foo-Bar-Baz", camelCaseToKebabCase("foo-bar-baz"))
+	require.Equal(t, "Foo_bar_baz", camelCaseToKebabCase("foo_bar_baz"))
 	require.Equal(t, "foo bar baz", camelCaseToKebabCase("foo bar baz"))
+
+	require.Equal(t, "Aws-Trace-Id", camelCaseToKebabCase("AWSTraceID"))
+	require.Equal(t, "Http-Server-Ip", camelCaseToKebabCase("HTTPServerIP"))
+	require.Equal(t, "Http-Server-Url-Test", camelCaseToKebabCase("HTTPServerURLTest"))
 }
 
 func TestKebabCaseToCamelCase(t *testing.T) {
@@ -40,6 +44,10 @@ func TestKebabCaseToCamelCase(t *testing.T) {
 	require.Equal(t, "fooBarBaz", kebabCaseToCamelCase("foo-bar-baz"))
 	require.Equal(t, "foo_bar_baz", kebabCaseToCamelCase("foo_bar_baz"))
 	require.Equal(t, "foo bar baz", kebabCaseToCamelCase("foo bar baz"))
+
+	require.Equal(t, "AWSTraceID", kebabCaseToCamelCase("Aws-Trace-Id"))
+	require.Equal(t, "HTTPServerIP", kebabCaseToCamelCase("Http-Server-Ip"))
+	require.Equal(t, "HTTPServerURLTest", kebabCaseToCamelCase("Http-Server-Url-Test"))
 }
 
 func TestRundomBytes(t *testing.T) {
