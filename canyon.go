@@ -332,10 +332,12 @@ func newWorkerHandler(mux http.Handler, c *runOptions) sqsEventLambdaHandlerFunc
 	}
 	var once sync.Once
 	var visibilityTimeout time.Duration = -1 * time.Second
+	var sqsClient SQSClient
 	return func(ctx context.Context, event *events.SQSEvent) (*events.SQSEventResponse, error) {
 		handleStart := flextime.Now()
 		once.Do(func() {
 			queueURL, client := c.SQSClientAndQueueURL()
+			sqsClient = client
 			vt, err := getVisibilityTimeout(ctx, queueURL, client)
 			if err != nil {
 				var ae smithy.APIError
@@ -402,6 +404,11 @@ func newWorkerHandler(mux http.Handler, c *runOptions) sqsEventLambdaHandlerFunc
 						"error", err,
 					)
 					onFailure(record)
+					retryAfter, ok := ErrorHasRetryAfter(err)
+					if !ok {
+						return
+					}
+					setRetryAfter(&record, retryAfter)
 					return
 				}
 				embededCtx := EmbedIsWorkerInContext(ctx, true)
@@ -461,7 +468,7 @@ func newWorkerHandler(mux http.Handler, c *runOptions) sqsEventLambdaHandlerFunc
 			for i := range changeMessageVisibilityBatchInput.Entries {
 				changeMessageVisibilityBatchInput.Entries[i].VisibilityTimeout += int32(time.Since(handleStart).Seconds())
 			}
-			if _, err := c.sqsClient.ChangeMessageVisibilityBatch(ctx, changeMessageVisibilityBatchInput); err != nil {
+			if _, err := sqsClient.ChangeMessageVisibilityBatch(ctx, changeMessageVisibilityBatchInput); err != nil {
 				logger.WarnContext(ctx, "failed to change message visibility", "error", err)
 			}
 		}

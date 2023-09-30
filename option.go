@@ -252,12 +252,15 @@ func WithVarbose() Option {
 // if set this option, canyon not used real AWS SQS.
 // only used on memory queue.
 // for local development.
-func WithInMemoryQueue(visibilityTimeout time.Duration, maxReceiveCount int64, dlq io.Writer) Option {
+func WithInMemoryQueue(visibilityTimeout time.Duration, maxReceiveCount int32, dlq io.Writer) Option {
 	return func(c *runOptions) {
 		c.useInMemorySQS = true
+		c.inMemorySQSClientVisibilityTimeout = visibilityTimeout
+		c.inMemorySQSClientMaxReceiveCount = maxReceiveCount
 		if dlq == nil {
-			c.inMemorySQSClientDLQ = io.Discard
+			dlq = io.Discard
 		}
+		c.inMemorySQSClientDLQ = dlq
 	}
 }
 

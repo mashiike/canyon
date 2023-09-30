@@ -376,11 +376,11 @@ func (c *inMemorySQSClient) SendMessage(ctx context.Context, params *sqs.SendMes
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	c.messages[*msg.MessageId] = msg
-	receiveableTime := flextime.Now()
+	receivableTime := flextime.Now()
 	if params.DelaySeconds > 0 {
-		receiveableTime = receiveableTime.Add(time.Duration(params.DelaySeconds) * time.Second)
+		receivableTime = receivableTime.Add(time.Duration(params.DelaySeconds) * time.Second)
 	}
-	c.receivableTime[*msg.MessageId] = receiveableTime
+	c.receivableTime[*msg.MessageId] = receivableTime
 	c.logger.DebugContext(ctx, "enqueue to on memory queue", "current_queue_size", len(c.messages), "enqueued_message_id", *msg.MessageId)
 	return &sqs.SendMessageOutput{
 		MessageId: msg.MessageId,
@@ -434,12 +434,9 @@ func (c *inMemorySQSClient) ReceiveMessage(ctx context.Context, params *sqs.Rece
 					delete(c.processingStartTime, key)
 					delete(c.messageVisibilityTimeout, key)
 					delete(c.messageIDByReceiptHandle, *msg.ReceiptHandle)
-					if c.approximateReceiveCount[key] >= c.maxReceiveCount {
-						c.logger.InfoContext(ctx, "delete message because approximate receive count reached to max recevice count", "message_id", key, "approximate_receive_count", c.approximateReceiveCount[*msg.MessageId], "max_receive_count", c.maxReceiveCount)
-						c.dlq.Encode(msg)
-						delete(c.messages, key)
-						delete(c.approximateReceiveCount, key)
-					}
+					continue
+				}
+				if receivableTime, ok := c.receivableTime[key]; ok && receivableTime.After(time.Now()) {
 					continue
 				}
 				c.isProcessing[key] = true
@@ -450,6 +447,22 @@ func (c *inMemorySQSClient) ReceiveMessage(ctx context.Context, params *sqs.Rece
 					c.messageVisibilityTimeout[key] = c.visibilityTimeout
 				}
 				c.approximateReceiveCount[key]++
+				c.logger.DebugContext(ctx, "dequeue from on memory queue",
+					"current_queue_size", len(c.messages),
+					"dequeued_message_id", key,
+					"approximate_receive_count", c.approximateReceiveCount[key],
+				)
+				if c.approximateReceiveCount[key] > c.maxReceiveCount {
+					c.logger.InfoContext(ctx, "delete message because approximate receive count reached to max recevice count", "message_id", key, "approximate_receive_count", c.approximateReceiveCount[*msg.MessageId], "max_receive_count", c.maxReceiveCount)
+					c.dlq.Encode(msg)
+					delete(c.messages, key)
+					delete(c.approximateReceiveCount, key)
+					delete(c.isProcessing, key)
+					delete(c.processingStartTime, key)
+					delete(c.messageVisibilityTimeout, key)
+					delete(c.messageIDByReceiptHandle, *msg.ReceiptHandle)
+					continue
+				}
 				receiptHandle := fmt.Sprintf(
 					"%s/%s",
 					base64.StdEncoding.EncodeToString(randomBytes(32)),
