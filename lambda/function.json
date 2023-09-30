@@ -14,7 +14,7 @@
   "Role": "arn:aws:iam::{{ must_env `AWS_ACCOUNT_ID` }}:role/canyon-example",
   "Runtime": "provided.al2",
   "Tags": {},
-  "Timeout": 30,
+  "Timeout": 300,
   "TracingConfig": {
       "Mode": "PassThrough"
   }
