@@ -9,15 +9,18 @@ import (
 	"io"
 	"net"
 	"net/http"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
 
 	"log/slog"
 
+	"github.com/Songmu/flextime"
 	"github.com/aws/aws-lambda-go/events"
 	"github.com/aws/aws-lambda-go/lambda"
 	"github.com/aws/aws-sdk-go-v2/aws"
+	"github.com/aws/aws-sdk-go-v2/service/sqs"
 	"github.com/aws/aws-sdk-go-v2/service/sqs/types"
 	"github.com/aws/smithy-go"
 	"github.com/fujiwara/ridge"
@@ -329,9 +332,12 @@ func newWorkerHandler(mux http.Handler, c *runOptions) sqsEventLambdaHandlerFunc
 	}
 	var once sync.Once
 	var visibilityTimeout time.Duration = -1 * time.Second
+	var sqsClient SQSClient
 	return func(ctx context.Context, event *events.SQSEvent) (*events.SQSEventResponse, error) {
+		handleStart := flextime.Now()
 		once.Do(func() {
 			queueURL, client := c.SQSClientAndQueueURL()
+			sqsClient = client
 			vt, err := getVisibilityTimeout(ctx, queueURL, client)
 			if err != nil {
 				var ae smithy.APIError
@@ -355,6 +361,34 @@ func newWorkerHandler(mux http.Handler, c *runOptions) sqsEventLambdaHandlerFunc
 		}
 		messageIds := make([]string, 0, len(event.Records))
 		completed := make(map[string]bool, len(event.Records))
+		changeMessageVisibilityBatchInput := &sqs.ChangeMessageVisibilityBatchInput{
+			QueueUrl: aws.String(c.sqsQueueURL),
+		}
+		onFailure := func(record events.SQSMessage) {
+			mu.Lock()
+			defer mu.Unlock()
+			resp.BatchItemFailures = append(resp.BatchItemFailures, events.SQSBatchItemFailure{
+				ItemIdentifier: record.MessageId,
+			})
+			completed[record.MessageId] = true
+		}
+		onSuccess := func(record events.SQSMessage) {
+			mu.Lock()
+			defer mu.Unlock()
+			completed[record.MessageId] = true
+		}
+		setRetryAfter := func(record *events.SQSMessage, retryAfterSeconds int32) {
+			mu.Lock()
+			defer mu.Unlock()
+			changeMessageVisibilityBatchInput.Entries = append(
+				changeMessageVisibilityBatchInput.Entries,
+				types.ChangeMessageVisibilityBatchRequestEntry{
+					Id:                aws.String(record.MessageId),
+					ReceiptHandle:     aws.String(record.ReceiptHandle),
+					VisibilityTimeout: retryAfterSeconds, // after adding current visibility timeout
+				},
+			)
+		}
 		for _, record := range event.Records {
 			wg.Add(1)
 			_logger := logger.With(slog.String("message_id", record.MessageId))
@@ -369,12 +403,12 @@ func newWorkerHandler(mux http.Handler, c *runOptions) sqsEventLambdaHandlerFunc
 						"failed to restore request from sqs message",
 						"error", err,
 					)
-					mu.Lock()
-					resp.BatchItemFailures = append(resp.BatchItemFailures, events.SQSBatchItemFailure{
-						ItemIdentifier: record.MessageId,
-					})
-					completed[record.MessageId] = true
-					mu.Unlock()
+					onFailure(record)
+					retryAfter, ok := ErrorHasRetryAfter(err)
+					if !ok {
+						return
+					}
+					setRetryAfter(&record, retryAfter)
 					return
 				}
 				embededCtx := EmbedIsWorkerInContext(ctx, true)
@@ -387,17 +421,25 @@ func newWorkerHandler(mux http.Handler, c *runOptions) sqsEventLambdaHandlerFunc
 						"failed worker handler",
 						"status_code", w.statusCode,
 					)
-					mu.Lock()
-					resp.BatchItemFailures = append(resp.BatchItemFailures, events.SQSBatchItemFailure{
-						ItemIdentifier: record.MessageId,
-					})
-					completed[record.MessageId] = true
-					mu.Unlock()
+					onFailure(record)
+					retryAfter := workerResp.Header.Get("Retry-After")
+					if retryAfter == "" {
+						return
+					}
+					retryAfterSeconds, err := strconv.ParseInt(retryAfter, 10, 32)
+					if err != nil {
+						_logger.WarnContext(
+							ctx,
+							"failed to parse Retry-After header",
+							"error", err,
+							"retry_after", retryAfter,
+						)
+						return
+					}
+					setRetryAfter(&record, int32(retryAfterSeconds))
 					return
 				}
-				mu.Lock()
-				completed[record.MessageId] = true
-				mu.Unlock()
+				onSuccess(record)
 			}(record)
 		}
 		allDone := make(chan struct{})
@@ -420,6 +462,14 @@ func newWorkerHandler(mux http.Handler, c *runOptions) sqsEventLambdaHandlerFunc
 					})
 				}
 				mu.Unlock()
+			}
+		}
+		if len(changeMessageVisibilityBatchInput.Entries) > 0 {
+			for i := range changeMessageVisibilityBatchInput.Entries {
+				changeMessageVisibilityBatchInput.Entries[i].VisibilityTimeout += int32(time.Since(handleStart).Seconds())
+			}
+			if _, err := sqsClient.ChangeMessageVisibilityBatch(ctx, changeMessageVisibilityBatchInput); err != nil {
+				logger.WarnContext(ctx, "failed to change message visibility", "error", err)
 			}
 		}
 		return &resp, nil

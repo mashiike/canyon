@@ -38,6 +38,7 @@ type SQSClient interface {
 	DeleteMessage(ctx context.Context, params *sqs.DeleteMessageInput, optFns ...func(*sqs.Options)) (*sqs.DeleteMessageOutput, error)
 	GetQueueUrl(ctx context.Context, params *sqs.GetQueueUrlInput, optFns ...func(*sqs.Options)) (*sqs.GetQueueUrlOutput, error)
 	GetQueueAttributes(ctx context.Context, params *sqs.GetQueueAttributesInput, optFns ...func(*sqs.Options)) (*sqs.GetQueueAttributesOutput, error)
+	ChangeMessageVisibilityBatch(ctx context.Context, params *sqs.ChangeMessageVisibilityBatchInput, optFns ...func(*sqs.Options)) (*sqs.ChangeMessageVisibilityBatchOutput, error)
 }
 
 type S3Client interface {
@@ -253,6 +254,7 @@ type inMemorySQSClient struct {
 	messageIDByReceiptHandle map[string]string
 	maxReceiveCount          int
 	visibilityTimeout        time.Duration
+	messageVisibilityTimeout map[string]time.Duration
 	logger                   *slog.Logger
 	dlq                      *json.Encoder
 }
@@ -282,6 +284,9 @@ func (c *inMemorySQSClient) prepare() {
 		if c.visibilityTimeout == 0 {
 			c.visibilityTimeout = 30 * time.Second
 		}
+		if c.messageVisibilityTimeout == nil {
+			c.messageVisibilityTimeout = make(map[string]time.Duration)
+		}
 		if c.maxReceiveCount == 0 {
 			c.maxReceiveCount = 3
 		}
@@ -293,6 +298,42 @@ func (c *inMemorySQSClient) prepare() {
 		}
 	})
 }
+
+func (c *inMemorySQSClient) ChangeMessageVisibilityBatch(ctx context.Context, params *sqs.ChangeMessageVisibilityBatchInput, optFns ...func(*sqs.Options)) (*sqs.ChangeMessageVisibilityBatchOutput, error) {
+	c.prepare()
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	ret := &sqs.ChangeMessageVisibilityBatchOutput{
+		Failed:     make([]types.BatchResultErrorEntry, 0, len(params.Entries)),
+		Successful: make([]types.ChangeMessageVisibilityBatchResultEntry, 0),
+	}
+	for _, entry := range params.Entries {
+		msgID, ok := c.messageIDByReceiptHandle[*entry.ReceiptHandle]
+		if !ok {
+			ret.Failed = append(ret.Failed, types.BatchResultErrorEntry{
+				Id:          entry.Id,
+				Code:        aws.String("ReceiptHandleIsInvalid"),
+				Message:     aws.String("The input receipt handle is invalid."),
+				SenderFault: true,
+			})
+			continue
+		}
+		if _, ok := c.messages[msgID]; !ok {
+			ret.Failed = append(ret.Failed, types.BatchResultErrorEntry{
+				Id:          entry.Id,
+				Code:        aws.String("MessageNotExist"),
+				Message:     aws.String("The message identified by the receipt handle does not exist or is not available for visibility timeout change."),
+				SenderFault: true,
+			})
+		}
+		c.messageVisibilityTimeout[msgID] = time.Duration(entry.VisibilityTimeout) * time.Second
+		ret.Successful = append(ret.Successful, types.ChangeMessageVisibilityBatchResultEntry{
+			Id: entry.Id,
+		})
+	}
+	return ret, nil
+}
+
 func (c *inMemorySQSClient) SendMessage(ctx context.Context, params *sqs.SendMessageInput, optFns ...func(*sqs.Options)) (*sqs.SendMessageOutput, error) {
 	c.prepare()
 	msg := &types.Message{
@@ -335,11 +376,11 @@ func (c *inMemorySQSClient) SendMessage(ctx context.Context, params *sqs.SendMes
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	c.messages[*msg.MessageId] = msg
-	receiveableTime := flextime.Now()
+	receivableTime := flextime.Now()
 	if params.DelaySeconds > 0 {
-		receiveableTime = receiveableTime.Add(time.Duration(params.DelaySeconds) * time.Second)
+		receivableTime = receivableTime.Add(time.Duration(params.DelaySeconds) * time.Second)
 	}
-	c.receivableTime[*msg.MessageId] = receiveableTime
+	c.receivableTime[*msg.MessageId] = receivableTime
 	c.logger.DebugContext(ctx, "enqueue to on memory queue", "current_queue_size", len(c.messages), "enqueued_message_id", *msg.MessageId)
 	return &sqs.SendMessageOutput{
 		MessageId: msg.MessageId,
@@ -386,23 +427,42 @@ func (c *inMemorySQSClient) ReceiveMessage(ctx context.Context, params *sqs.Rece
 				}
 				msg := c.messages[key]
 				if is, ok := c.isProcessing[key]; ok && is {
-					if time.Since(c.processingStartTime[key]) < c.visibilityTimeout {
+					if time.Since(c.processingStartTime[key]) < c.messageVisibilityTimeout[key] {
 						continue
 					}
 					delete(c.isProcessing, key)
 					delete(c.processingStartTime, key)
+					delete(c.messageVisibilityTimeout, key)
 					delete(c.messageIDByReceiptHandle, *msg.ReceiptHandle)
-					if c.approximateReceiveCount[key] >= c.maxReceiveCount {
-						c.logger.InfoContext(ctx, "delete message because approximate receive count reached to max recevice count", "message_id", key, "approximate_receive_count", c.approximateReceiveCount[*msg.MessageId], "max_receive_count", c.maxReceiveCount)
-						c.dlq.Encode(msg)
-						delete(c.messages, key)
-						delete(c.approximateReceiveCount, key)
-					}
+					continue
+				}
+				if receivableTime, ok := c.receivableTime[key]; ok && receivableTime.After(time.Now()) {
 					continue
 				}
 				c.isProcessing[key] = true
 				c.processingStartTime[key] = time.Now()
+				if params.VisibilityTimeout > 0 {
+					c.messageVisibilityTimeout[key] = time.Duration(params.VisibilityTimeout) * time.Second
+				} else {
+					c.messageVisibilityTimeout[key] = c.visibilityTimeout
+				}
 				c.approximateReceiveCount[key]++
+				c.logger.DebugContext(ctx, "dequeue from on memory queue",
+					"current_queue_size", len(c.messages),
+					"dequeued_message_id", key,
+					"approximate_receive_count", c.approximateReceiveCount[key],
+				)
+				if c.approximateReceiveCount[key] > c.maxReceiveCount {
+					c.logger.InfoContext(ctx, "delete message because approximate receive count reached to max recevice count", "message_id", key, "approximate_receive_count", c.approximateReceiveCount[*msg.MessageId], "max_receive_count", c.maxReceiveCount)
+					c.dlq.Encode(msg)
+					delete(c.messages, key)
+					delete(c.approximateReceiveCount, key)
+					delete(c.isProcessing, key)
+					delete(c.processingStartTime, key)
+					delete(c.messageVisibilityTimeout, key)
+					delete(c.messageIDByReceiptHandle, *msg.ReceiptHandle)
+					continue
+				}
 				receiptHandle := fmt.Sprintf(
 					"%s/%s",
 					base64.StdEncoding.EncodeToString(randomBytes(32)),

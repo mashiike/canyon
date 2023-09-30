@@ -102,6 +102,35 @@ helper function `canyon.ToMessageAttributes(...)` converts http.Header to sqs.Me
 
 ## Advanced Usage
 
+### Change Message Visibility on Worker Failure
+
+```go
+package main
+
+//...
+
+func handler(w http.ResponseWriter, r *http.Request) {
+    logger := canyon.Logger(r)
+    if !canyon.IsWorker(r) {
+        // ... 
+        return
+    }
+    // any thing in worker process
+    // ...
+    if err != nil {
+        w.Header().Set("Retry-After", "60") // set retry-after header
+        w.WriteHeader(http.StatusServiceUnavailable)
+        return
+    }
+    logger.Info("event request body", slog.String("body", string(bs)))
+    w.WriteHeader(http.StatusOK) // if 2xx is success, sqs message will be deleted
+}
+```
+
+in worker process, if control sqs message visibility, set `Retry-After` header.
+if `Retry-After` header is set, canyon set message visibility to `Retry-After` header value + current processing time.
+if `Retry-After` header is not set, canyon not change message visibility: keep sqs queue default visibility timeout.
+
 ### If customizing worker response behavior, use `canyon.WithWorkerResponseChecker`
 
 ```go

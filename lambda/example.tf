@@ -34,7 +34,7 @@ resource "aws_iam_role_policy_attachment" "canyon_example" {
 resource "aws_sqs_queue" "canyon_example" {
   name                       = "canyon-example"
   message_retention_seconds  = 86400
-  visibility_timeout_seconds = 30
+  visibility_timeout_seconds = 300
   redrive_policy = jsonencode({
     deadLetterTargetArn = aws_sqs_queue.canyon_example_dlq.arn
     maxReceiveCount     = 3

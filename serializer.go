@@ -9,9 +9,11 @@ import (
 	"fmt"
 	"io"
 	"log/slog"
+	"math/rand"
 	"net/http"
 	"strconv"
 
+	"github.com/Songmu/flextime"
 	"github.com/aws/aws-lambda-go/events"
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/sqs"
@@ -47,8 +49,10 @@ type jsonSerializableRequest struct {
 
 // DefaultSerializer is a struct for Serialize and Deserialize http.Request as SQS Message.
 type DefaultSerializer struct {
-	Backend Backend
-	Logger  *slog.Logger
+	Backend              Backend
+	Logger               *slog.Logger
+	BaseRetrySeconds     int32
+	JitterOfRetrySeconds int32
 }
 
 func NewDefaultSerializer() *DefaultSerializer {
@@ -159,4 +163,63 @@ func (s *DefaultSerializer) Deserialize(ctx context.Context, message *events.SQS
 	}
 	r = SetSQSMessageHeader(r, message)
 	return r, nil
+}
+
+type RetryAfterSerializer struct {
+	Serializer
+	BaseRetrySeconds     int32
+	JitterOfRetrySeconds int32
+	rand                 *rand.Rand
+}
+
+func NewRetryAfterSerializer(serializer Serializer, base int32, jitter int32) *RetryAfterSerializer {
+	return &RetryAfterSerializer{
+		Serializer:           serializer,
+		BaseRetrySeconds:     base,
+		JitterOfRetrySeconds: jitter,
+		rand:                 rand.New(rand.NewSource(flextime.Now().UnixNano())),
+	}
+}
+
+func (s *RetryAfterSerializer) Serialize(ctx context.Context, r *http.Request) (*sqs.SendMessageInput, error) {
+	return s.Serializer.Serialize(ctx, r)
+}
+
+func (s *RetryAfterSerializer) Deserialize(ctx context.Context, message *events.SQSMessage) (*http.Request, error) {
+	r, err := s.Serializer.Deserialize(ctx, message)
+	if err == nil {
+		return r, nil
+	}
+	retryAfter := s.BaseRetrySeconds
+	if s.JitterOfRetrySeconds > 0 {
+		retryAfter += s.rand.Int31n(s.JitterOfRetrySeconds)
+	}
+	return nil, WrapRetryAfter(err, retryAfter)
+}
+
+func (s *RetryAfterSerializer) Clone() *RetryAfterSerializer {
+	return &RetryAfterSerializer{
+		Serializer:           s.Serializer,
+		BaseRetrySeconds:     s.BaseRetrySeconds,
+		JitterOfRetrySeconds: s.JitterOfRetrySeconds,
+		rand:                 s.rand,
+	}
+}
+
+func (s *RetryAfterSerializer) WithBackend(backend Backend) Serializer {
+	if bs, ok := s.Serializer.(BackendSerializer); ok {
+		cloned := s.Clone()
+		cloned.Serializer = bs.WithBackend(backend)
+		return cloned
+	}
+	return s
+}
+
+func (s *RetryAfterSerializer) WithLogger(logger *slog.Logger) Serializer {
+	if ls, ok := s.Serializer.(LoggingableSerializer); ok {
+		cloned := s.Clone()
+		cloned.Serializer = ls.WithLogger(logger)
+		return cloned
+	}
+	return s
 }

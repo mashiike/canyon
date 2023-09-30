@@ -2,13 +2,17 @@ package canyon_test
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"io"
+	"log/slog"
 	"net/http"
 	"strings"
 	"sync"
 	"testing"
+	"time"
 
+	"github.com/aws/aws-lambda-go/events"
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/sqs"
 	"github.com/aws/aws-sdk-go-v2/service/sqs/types"
@@ -18,9 +22,10 @@ import (
 )
 
 type mockSQSClient struct {
-	SendMessageFunc    func(ctx context.Context, params *sqs.SendMessageInput, optFns ...func(*sqs.Options)) (*sqs.SendMessageOutput, error)
-	ReceiveMessageFunc func(ctx context.Context, params *sqs.ReceiveMessageInput, optFns ...func(*sqs.Options)) (*sqs.ReceiveMessageOutput, error)
-	DeleteMessageFunc  func(ctx context.Context, params *sqs.DeleteMessageInput, optFns ...func(*sqs.Options)) (*sqs.DeleteMessageOutput, error)
+	SendMessageFunc                  func(ctx context.Context, params *sqs.SendMessageInput, optFns ...func(*sqs.Options)) (*sqs.SendMessageOutput, error)
+	ReceiveMessageFunc               func(ctx context.Context, params *sqs.ReceiveMessageInput, optFns ...func(*sqs.Options)) (*sqs.ReceiveMessageOutput, error)
+	DeleteMessageFunc                func(ctx context.Context, params *sqs.DeleteMessageInput, optFns ...func(*sqs.Options)) (*sqs.DeleteMessageOutput, error)
+	ChangeMessageVisibilityBatchFunc func(ctx context.Context, params *sqs.ChangeMessageVisibilityBatchInput, optFns ...func(*sqs.Options)) (*sqs.ChangeMessageVisibilityBatchOutput, error)
 }
 
 func (c *mockSQSClient) GetQueueAttributes(ctx context.Context, params *sqs.GetQueueAttributesInput, optFns ...func(*sqs.Options)) (*sqs.GetQueueAttributesOutput, error) {
@@ -59,6 +64,13 @@ func (c *mockSQSClient) DeleteMessage(ctx context.Context, params *sqs.DeleteMes
 		return c.DeleteMessageFunc(ctx, params, optFns...)
 	}
 	return &sqs.DeleteMessageOutput{}, nil
+}
+
+func (c *mockSQSClient) ChangeMessageVisibilityBatch(ctx context.Context, params *sqs.ChangeMessageVisibilityBatchInput, optFns ...func(*sqs.Options)) (*sqs.ChangeMessageVisibilityBatchOutput, error) {
+	if c.ChangeMessageVisibilityBatchFunc != nil {
+		return c.ChangeMessageVisibilityBatchFunc(ctx, params, optFns...)
+	}
+	return &sqs.ChangeMessageVisibilityBatchOutput{}, nil
 }
 
 func TestE2E_SendToWorkerFailed(t *testing.T) {
@@ -119,4 +131,101 @@ func TestE2E__HandlerReadBody(t *testing.T) {
 	wg.Wait()
 	require.Equal(t, "hello world", string(serverBody), "should read body")
 	require.Equal(t, "hello world", string(workerBody), "should read body")
+}
+
+func TestE2E__WithRetryAfterHeader(t *testing.T) {
+	callCount := 0
+	doneCh := make(chan struct{})
+	r := canyontest.NewRunner(
+		http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			if canyon.IsWorker(r) {
+				callCount++
+				if callCount == 1 {
+					w.Header().Set("Retry-After", "1")
+					w.WriteHeader(http.StatusInternalServerError)
+					return
+				}
+				w.WriteHeader(http.StatusOK)
+				close(doneCh)
+				return
+			}
+			canyon.SendToWorker(r, nil)
+			w.WriteHeader(http.StatusOK)
+		}),
+	)
+	defer r.Close()
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	req, err := http.NewRequest(http.MethodPost, r.URL, strings.NewReader("test body"))
+	require.NoError(t, err)
+	resp, err := http.DefaultClient.Do(req)
+	require.NoError(t, err)
+	require.Equal(t, http.StatusOK, resp.StatusCode)
+	select {
+	case <-ctx.Done():
+		require.Fail(t, "timeout")
+	case <-doneCh:
+		require.Equal(t, 2, callCount)
+	}
+}
+
+type AlwaysDeserializeErrorSerializer struct {
+	canyon.Serializer
+}
+
+func (s *AlwaysDeserializeErrorSerializer) Deserialize(ctx context.Context, message *events.SQSMessage) (*http.Request, error) {
+	return nil, errors.New("always deserialize error")
+}
+
+func TestE2E__DeserializeErrorWithRetryAfter(t *testing.T) {
+	var logBuf strings.Builder
+	defer func() {
+		t.Log(logBuf.String())
+	}()
+	logger := slog.New(slog.NewTextHandler(
+		&logBuf,
+		&slog.HandlerOptions{
+			Level: slog.LevelDebug,
+		},
+	))
+	serializer := canyon.NewRetryAfterSerializer(
+		&AlwaysDeserializeErrorSerializer{Serializer: canyon.NewDefaultSerializer()},
+		0, 0,
+	)
+	r := canyontest.NewRunner(
+		http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			if canyon.IsWorker(r) {
+				require.Fail(t, "should not be worker, maybe no deserialize error")
+				return
+			}
+			canyon.SendToWorker(r, nil)
+			w.WriteHeader(http.StatusOK)
+		}),
+		canyon.WithLogger(logger),
+		canyon.WithVarbose(),
+		canyon.WithSerializer(serializer),
+	)
+	defer r.Close()
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+	req, err := http.NewRequest(http.MethodPost, r.URL, strings.NewReader("test body"))
+	require.NoError(t, err)
+	resp, err := http.DefaultClient.Do(req)
+	require.NoError(t, err)
+	require.Equal(t, http.StatusOK, resp.StatusCode)
+	dlqCh := make(chan struct{})
+	go func() {
+		var msg json.RawMessage
+		err := json.NewDecoder(r.DLQReader()).Decode(&msg)
+		t.Log(string(msg))
+		if !errors.Is(err, io.ErrClosedPipe) {
+			require.NoError(t, err)
+		}
+		close(dlqCh)
+	}()
+	select {
+	case <-ctx.Done():
+		require.Fail(t, "timeout")
+	case <-dlqCh:
+	}
 }

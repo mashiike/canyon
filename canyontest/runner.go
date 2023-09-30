@@ -6,7 +6,6 @@ import (
 	"io"
 	"net"
 	"net/http"
-	"os"
 	"sync"
 	"time"
 
@@ -34,10 +33,12 @@ type Runner struct {
 	Listener net.Listener
 	Stdin    io.WriteCloser
 
-	closed   bool
-	cancel   context.CancelCauseFunc
-	wg       sync.WaitGroup
-	runError error
+	closed    bool
+	cancel    context.CancelCauseFunc
+	wg        sync.WaitGroup
+	runError  error
+	dlqReader io.ReadCloser
+	dlqWriter io.WriteCloser
 }
 
 func NewRunner(mux http.Handler, _opts ...canyon.Option) *Runner {
@@ -59,12 +60,14 @@ func NewRunner(mux http.Handler, _opts ...canyon.Option) *Runner {
 		},
 		cancel: cancel,
 	}
+	r.dlqReader, r.dlqWriter = io.Pipe()
+
 	opts := []canyon.Option{
 		canyon.WithListener(listener),
 		canyon.WithInMemoryQueue(
 			30*time.Second, // on memory queue's default visibility timeout
 			10,             // on memory queue's default max receive count,
-			os.Stdout,      // if exceed max receive count, message will be sent to stdout as json
+			r.dlqWriter,
 		),
 		canyon.WithBackend(canyon.NewInMemoryBackend()),
 		canyon.WithStdin(pr),
@@ -92,8 +95,14 @@ func (r *Runner) Close() error {
 	r.closed = true
 	r.Listener.Close()
 	r.Stdin.Close()
+	r.dlqReader.Close()
+	r.dlqWriter.Close()
 	r.wg.Wait()
 	return nil
+}
+
+func (r *Runner) DLQReader() io.Reader {
+	return r.dlqReader
 }
 
 func (r *Runner) RunError() error {
