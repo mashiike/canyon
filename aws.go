@@ -326,7 +326,7 @@ func (c *inMemorySQSClient) ChangeMessageVisibilityBatch(ctx context.Context, pa
 				SenderFault: true,
 			})
 		}
-		c.messageVisibilityTimeout[msgID] = time.Duration(entry.VisibilityTimeout) * time.Second
+		c.messageVisibilityTimeout[msgID] = time.Since(c.processingStartTime[msgID]) + time.Duration(entry.VisibilityTimeout)*time.Second
 		ret.Successful = append(ret.Successful, types.ChangeMessageVisibilityBatchResultEntry{
 			Id: entry.Id,
 		})

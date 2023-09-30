@@ -16,7 +16,6 @@ import (
 
 	"log/slog"
 
-	"github.com/Songmu/flextime"
 	"github.com/aws/aws-lambda-go/events"
 	"github.com/aws/aws-lambda-go/lambda"
 	"github.com/aws/aws-sdk-go-v2/aws"
@@ -334,7 +333,6 @@ func newWorkerHandler(mux http.Handler, c *runOptions) sqsEventLambdaHandlerFunc
 	var visibilityTimeout time.Duration = -1 * time.Second
 	var sqsClient SQSClient
 	return func(ctx context.Context, event *events.SQSEvent) (*events.SQSEventResponse, error) {
-		handleStart := flextime.Now()
 		once.Do(func() {
 			queueURL, client := c.SQSClientAndQueueURL()
 			sqsClient = client
@@ -465,9 +463,6 @@ func newWorkerHandler(mux http.Handler, c *runOptions) sqsEventLambdaHandlerFunc
 			}
 		}
 		if len(changeMessageVisibilityBatchInput.Entries) > 0 {
-			for i := range changeMessageVisibilityBatchInput.Entries {
-				changeMessageVisibilityBatchInput.Entries[i].VisibilityTimeout += int32(time.Since(handleStart).Seconds())
-			}
 			if _, err := sqsClient.ChangeMessageVisibilityBatch(ctx, changeMessageVisibilityBatchInput); err != nil {
 				logger.WarnContext(ctx, "failed to change message visibility", "error", err)
 			}
