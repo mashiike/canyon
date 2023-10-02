@@ -9,7 +9,7 @@ require (
 	github.com/aws/aws-sdk-go-v2/config v1.18.42
 	github.com/aws/aws-sdk-go-v2/feature/s3/manager v1.11.86
 	github.com/aws/aws-sdk-go-v2/service/lambda v1.39.5
-	github.com/aws/aws-sdk-go-v2/service/s3 v1.39.0
+	github.com/aws/aws-sdk-go-v2/service/s3 v1.40.0
 	github.com/aws/aws-sdk-go-v2/service/scheduler v1.3.0
 	github.com/aws/aws-sdk-go-v2/service/sqs v1.24.5
 	github.com/aws/aws-sdk-go-v2/service/sts v1.22.0
