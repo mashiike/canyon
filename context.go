@@ -64,6 +64,18 @@ func IsWorker(r *http.Request) bool {
 	return isWorker
 }
 
+// Used return true if the request handled by canyon.
+func Used(r *http.Request) bool {
+	ctx := r.Context()
+	if ctx == nil {
+		return false
+	}
+	if _, ok := ctx.Value(contextKeyWorkerSender).(WorkerSender); ok {
+		return true
+	}
+	return IsWorker(r)
+}
+
 // EmbedIsWorkerInContext embeds isWorker flag in context.
 //
 //	this function is for http.Handler unit testing.
