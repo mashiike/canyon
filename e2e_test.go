@@ -7,6 +7,7 @@ import (
 	"io"
 	"log/slog"
 	"net/http"
+	"net/http/httptest"
 	"strings"
 	"sync"
 	"testing"
@@ -75,6 +76,7 @@ func (c *mockSQSClient) ChangeMessageVisibilityBatch(ctx context.Context, params
 
 func TestE2E_SendToWorkerFailed(t *testing.T) {
 	h := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		require.True(t, canyon.Used(r), "should be used")
 		if !canyon.IsWorker(r) {
 			if _, err := canyon.SendToWorker(r, nil); err != nil {
 				require.EqualError(t, err, "failed to send sqs message: test")
@@ -228,4 +230,33 @@ func TestE2E__DeserializeErrorWithRetryAfter(t *testing.T) {
 		require.Fail(t, "timeout")
 	case <-dlqCh:
 	}
+}
+
+func TestUsed(t *testing.T) {
+	h := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		require.False(t, canyon.Used(r), "should be used")
+		w.WriteHeader(http.StatusOK)
+	})
+	r := httptest.NewRequest(http.MethodPost, "/", nil)
+	w := httptest.NewRecorder()
+	h.ServeHTTP(w, r)
+	require.Equal(t, http.StatusOK, w.Code)
+
+	h = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		require.True(t, canyon.Used(r), "should be used")
+		w.WriteHeader(http.StatusOK)
+	})
+	r = httptest.NewRequest(http.MethodPost, "/", nil)
+	w = httptest.NewRecorder()
+	canyontest.AsWorker(h).ServeHTTP(w, r)
+	require.Equal(t, http.StatusOK, w.Code)
+
+	r = httptest.NewRequest(http.MethodPost, "/", nil)
+	w = httptest.NewRecorder()
+	canyontest.AsServer(h, canyon.WorkerSenderFunc(
+		func(r *http.Request, opts *canyon.SendOptions) (string, error) {
+			return "", nil
+		},
+	)).ServeHTTP(w, r)
+	require.Equal(t, http.StatusOK, w.Code)
 }
