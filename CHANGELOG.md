@@ -1,5 +1,8 @@
 # Changelog
 
+## [v0.6.1](https://github.com/mashiike/canyon/compare/v0.6.0...v0.6.1) - 2023-10-07
+- add util function for check runs on canyon by @mashiike in https://github.com/mashiike/canyon/pull/40
+
 ## [v0.6.0](https://github.com/mashiike/canyon/compare/v0.5.0...v0.6.0) - 2023-09-30
 - Add support for Retry-After header in worker by @mashiike in https://github.com/mashiike/canyon/pull/32
 - fix ChangeMessageVisibility by @mashiike in https://github.com/mashiike/canyon/pull/34
