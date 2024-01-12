@@ -370,7 +370,7 @@ func TestS3BackendLoadRequestBody(t *testing.T) {
 			require.Equal(t, "my-bucket", *input.Bucket)
 			require.Equal(t, "my-prefix/my-object/data.bin", *input.Key)
 			return &s3.HeadObjectOutput{
-				ContentLength: int64(len(body)),
+				ContentLength: aws.Int64(int64(len(body))),
 			}, nil
 		},
 		GetObjectFunc: func(_ context.Context, input *s3.GetObjectInput, _ ...func(*s3.Options)) (*s3.GetObjectOutput, error) {
@@ -378,7 +378,7 @@ func TestS3BackendLoadRequestBody(t *testing.T) {
 			require.Equal(t, "my-prefix/my-object/data.bin", *input.Key)
 			return &s3.GetObjectOutput{
 				Body:          io.NopCloser(strings.NewReader(body)),
-				ContentLength: int64(len(body)),
+				ContentLength: aws.Int64(int64(len(body))),
 			}, nil
 		},
 	})

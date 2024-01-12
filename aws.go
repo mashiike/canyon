@@ -642,7 +642,7 @@ func (b *S3Backend) LoadRequestBody(ctx context.Context, u *url.URL) (io.ReadClo
 	if err != nil {
 		return nil, fmt.Errorf("failed to head object: %w", err)
 	}
-	buf := manager.NewWriteAtBuffer(make([]byte, head.ContentLength))
+	buf := manager.NewWriteAtBuffer(make([]byte, *head.ContentLength))
 	_, err = b.downloader.Download(context.Background(), buf, &s3.GetObjectInput{
 		Bucket: aws.String(u.Host),
 		Key:    aws.String(objectKey),
@@ -650,7 +650,7 @@ func (b *S3Backend) LoadRequestBody(ctx context.Context, u *url.URL) (io.ReadClo
 	if err != nil {
 		return nil, fmt.Errorf("failed to download request: %w", err)
 	}
-	objectBody := buf.Bytes()[:head.ContentLength]
+	objectBody := buf.Bytes()[:*head.ContentLength]
 	return io.NopCloser(bytes.NewReader(objectBody)), nil
 }
 
