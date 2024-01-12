@@ -390,5 +390,6 @@ func TestS3BackendLoadRequestBody(t *testing.T) {
 	})
 	require.NoError(t, err, "should load request body")
 	actual, err := io.ReadAll(actualReader)
+	require.NoError(t, err, "should read body")
 	require.Equal(t, body, string(actual), "should save request body")
 }
