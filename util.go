@@ -182,6 +182,29 @@ func SetSQSMessageHeader(r *http.Request, message *events.SQSMessage) *http.Requ
 	return r
 }
 
+const (
+	HeaderAPIGatewayWebsocketConnectionID = "Api-Gateway-Websocket-Connection-Id"
+	HeaderAPIGatewayWebsocketRouteKey     = "Api-Gateway-Websocket-Route-Key"
+	HeaderAPIGatewayWebsocketAPIID        = "Api-Gateway-Websocket-Api-Id"
+	HeaderAPIGatewayWebsocketStage        = "Api-Gateway-Websocket-Stage"
+)
+
+func SetAPIGatewayWebsocketProxyHeader(r *http.Request, reqCtx *events.APIGatewayWebsocketProxyRequestContext) *http.Request {
+	r.Header.Set(HeaderAPIGatewayWebsocketConnectionID, reqCtx.ConnectionID)
+	r.Header.Set(HeaderAPIGatewayWebsocketRouteKey, reqCtx.RouteKey)
+	r.Header.Set(HeaderAPIGatewayWebsocketAPIID, reqCtx.APIID)
+	r.Header.Set(HeaderAPIGatewayWebsocketStage, reqCtx.Stage)
+	return r
+}
+
+func WebsocketRouteKey(r *http.Request) string {
+	return r.Header.Get(HeaderAPIGatewayWebsocketRouteKey)
+}
+
+func WebsocketConnectionID(r *http.Request) string {
+	return r.Header.Get(HeaderAPIGatewayWebsocketConnectionID)
+}
+
 var randomReader = rand.New(rand.NewSource(time.Now().UnixNano()))
 
 func randomBytes(n int) []byte {
@@ -213,9 +236,7 @@ func ToMessageAttributes(h http.Header) map[string]MessageAttributeValue {
 			continue
 		}
 		sl := make([]string, len(v))
-		for i, s := range v {
-			sl[i] = s
-		}
+		copy(sl, v)
 		m[k] = MessageAttributeValue{
 			DataType:         "String",
 			StringListValues: sl,
