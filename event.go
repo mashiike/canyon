@@ -21,7 +21,6 @@ type eventPayload struct {
 	IsHTTPEvent           bool
 	IsWebsocketProxyEvent bool
 	Request               *http.Request
-	RequestContext        *events.APIGatewayWebsocketProxyRequestContext
 }
 
 func (p *eventPayload) UnmarshalJSON(bs []byte) error {
@@ -49,7 +48,6 @@ func (p *eventPayload) UnmarshalJSON(bs []byte) error {
 		if reqCtx.APIID != "" && reqCtx.ConnectionID != "" {
 			p.IsWebsocketProxyEvent = true
 			p.Request = req
-			p.RequestContext = reqCtx
 			return nil
 		}
 		newWebsocketProxyRequestErr = errors.New("no APIID and ConnectionID")

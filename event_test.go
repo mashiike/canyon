@@ -33,7 +33,6 @@ func TestEventPayload__WebsocketConnectEvent(t *testing.T) {
 	require.NoError(t, err, "should unmarshal")
 	require.True(t, p.IsWebsocketProxyEvent, "should be websocket connect event")
 	require.NotNil(t, p.Request, "should have websocket proxy request")
-	require.NotNil(t, p.RequestContext, "should have websocket proxy request context")
 	require.EqualValues(t, "$connect", WebsocketRouteKey(p.Request), "should have route key")
 	require.EqualValues(t, "ZZZZZZZZZZZZZZZ=", WebsocketConnectionID(p.Request), "should have connection id")
 }
@@ -44,7 +43,6 @@ func TestEventPayload__WebsocketDisconnectEvent(t *testing.T) {
 	require.NoError(t, err, "should unmarshal")
 	require.True(t, p.IsWebsocketProxyEvent, "should be websocket disconnect event")
 	require.NotNil(t, p.Request, "should have websocket proxy request")
-	require.NotNil(t, p.RequestContext, "should have websocket proxy request context")
 	require.EqualValues(t, "$disconnect", WebsocketRouteKey(p.Request), "should have route key")
 	require.EqualValues(t, "ZZZZZZZZZZZZZZZ=", WebsocketConnectionID(p.Request), "should have connection id")
 }
@@ -55,7 +53,6 @@ func TestEventPayload__WebsocketDefaultEvent(t *testing.T) {
 	require.NoError(t, err, "should unmarshal")
 	require.True(t, p.IsWebsocketProxyEvent, "should be websocket default event")
 	require.NotNil(t, p.Request, "should have websocket proxy request")
-	require.NotNil(t, p.RequestContext, "should have websocket proxy request context")
 	require.EqualValues(t, "$default", WebsocketRouteKey(p.Request), "should have route key")
 	require.EqualValues(t, "ZZZZZZZZZZZZZZZ=", WebsocketConnectionID(p.Request), "should have connection id")
 }
@@ -66,7 +63,6 @@ func TestEventPayload__WebsocketMessageEvent(t *testing.T) {
 	require.NoError(t, err, "should unmarshal")
 	require.True(t, p.IsWebsocketProxyEvent, "should be websocket message event")
 	require.NotNil(t, p.Request, "should have websocket proxy request")
-	require.NotNil(t, p.RequestContext, "should have websocket proxy request context")
 	require.EqualValues(t, "hello", WebsocketRouteKey(p.Request), "should have message")
 	require.EqualValues(t, "ZZZZZZZZZZZZZZZ=", WebsocketConnectionID(p.Request), "should have connection id")
 }

@@ -82,7 +82,7 @@ func runWithContext(ctx context.Context, mux http.Handler, c *runOptions) error 
 					}
 					return nil, err
 				}
-				if p.IsSQSEvent && !c.disableWorker {
+				if p.IsSQSEvent {
 					if len(p.SQSEvent.Records) > 1 {
 						onceCheckFunctionResponseTypes.Do(func() {
 							checkFunctionResponseTypes(ctx, c)
@@ -104,12 +104,19 @@ func runWithContext(ctx context.Context, mux http.Handler, c *runOptions) error 
 					}
 					return resp, nil
 				}
-				if p.IsHTTPEvent && !c.disableServer {
+				if p.IsHTTPEvent {
 					r := p.Request.WithContext(ctx)
 					w := ridge.NewResponseWriter()
 					serverHandler.ServeHTTP(w, r)
 					return w.Response(), nil
 				}
+				if p.IsWebsocketProxyEvent {
+					r := p.Request.WithContext(ctx)
+					w := ridge.NewResponseWriter()
+					serverHandler.ServeHTTP(w, r)
+					return w.Response(), nil
+				}
+
 				if lambdaFallbackHandler != nil {
 					return lambdaFallbackHandler.Invoke(ctx, event)
 				}

@@ -8,6 +8,7 @@ import (
 	"net/http/httptest"
 	"testing"
 
+	"github.com/aws/aws-lambda-go/events"
 	"github.com/aws/aws-lambda-go/lambda"
 	"github.com/mashiike/canyon"
 	"github.com/mashiike/canyon/canyontest"
@@ -20,6 +21,7 @@ func TestAsServer(t *testing.T) {
 			require.Equal(t, "POST", r.Method)
 			require.Equal(t, "/", r.URL.Path)
 			require.False(t, canyon.IsWorker(r), "should not be worker")
+			require.False(t, canyon.IsWebsocket(r), "should not be websocket")
 			msgId, err := canyon.SendToWorker(r, nil)
 			require.NoError(t, err, "should send to sqs from server")
 			require.Equal(t, "message-id", msgId, "should return message id")
@@ -51,6 +53,36 @@ func TestAsWorker(t *testing.T) {
 		}),
 	)
 	req := httptest.NewRequest(http.MethodPost, "/", nil)
+	w := httptest.NewRecorder()
+	sh.ServeHTTP(w, req)
+	resp := w.Result()
+	require.Equal(t, http.StatusOK, resp.StatusCode, "should return 200")
+}
+
+func TestAsWebsocket(t *testing.T) {
+	sh := canyontest.AsWebsocket(
+		http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			require.Equal(t, "GET", r.Method)
+			require.False(t, canyon.IsWorker(r), "should not be worker")
+			require.True(t, canyon.IsWebsocket(r), "should be websocket")
+			require.Equal(t, "hello", canyon.WebsocketRouteKey(r), "should embed route key")
+			require.Equal(t, "ZZZZZZZZZZZZZZZ=", canyon.WebsocketConnectionID(r), "should embed connection id")
+			msgId, err := canyon.SendToWorker(r, nil)
+			require.NoError(t, err, "should send to sqs from server")
+			require.Equal(t, "message-id", msgId, "should return message id")
+			w.WriteHeader(http.StatusOK)
+		}),
+		events.APIGatewayWebsocketProxyRequestContext{
+			ConnectionID: "ZZZZZZZZZZZZZZZ=",
+			RouteKey:     "hello",
+		},
+		canyon.WorkerSenderFunc(func(r *http.Request, _ *canyon.SendOptions) (string, error) {
+			require.Equal(t, "GET", r.Method)
+			require.Equal(t, "hello", canyon.WebsocketRouteKey(r), "should embed route key")
+			return "message-id", nil
+		}),
+	)
+	req := httptest.NewRequest(http.MethodGet, "/", nil)
 	w := httptest.NewRecorder()
 	sh.ServeHTTP(w, req)
 	resp := w.Result()

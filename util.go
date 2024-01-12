@@ -205,6 +205,11 @@ func WebsocketConnectionID(r *http.Request) string {
 	return r.Header.Get(HeaderAPIGatewayWebsocketConnectionID)
 }
 
+// IsWebsocket returns true if the request is from websocket proxy.
+func IsWebsocket(r *http.Request) bool {
+	return WebsocketRouteKey(r) != "" && WebsocketConnectionID(r) != ""
+}
+
 var randomReader = rand.New(rand.NewSource(time.Now().UnixNano()))
 
 func randomBytes(n int) []byte {

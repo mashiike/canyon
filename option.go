@@ -61,6 +61,7 @@ type runOptions struct {
 	responseChecker                    WorkerResponseChecker
 	disableWorker                      bool
 	disableServer                      bool
+	disableWebsocket                   bool
 	cleanupFuncs                       []func()
 	lambdaFallbackHandler              lambda.Handler
 	stdin                              io.Reader
@@ -85,6 +86,7 @@ func defaultRunConfig(cancel context.CancelCauseFunc, sqsQueueName string) *runO
 		responseChecker:                    DefaultWorkerResponseChecker,
 		disableWorker:                      false,
 		disableServer:                      false,
+		disableWebsocket:                   true,
 		cleanupFuncs:                       []func(){},
 		lambdaFallbackHandler:              nil,
 		stdin:                              os.Stdin,
