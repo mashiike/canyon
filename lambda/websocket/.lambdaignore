@@ -1,0 +1,10 @@
+.gitignore
+Makefile
+*.tf
+.terraform*
+.lambdaignore
+function.json
+function.zip
+.git/*
+canyon_example.zip
+config.tf.example

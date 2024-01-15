@@ -228,7 +228,7 @@ func runWithContext(ctx context.Context, mux http.Handler, c *runOptions) error 
 		if c.websocketListener == nil {
 			var err error
 			c.logger.InfoContext(ctx, "starting up with local websocket server", "address", c.websocketAddress)
-			websocketListener, err = net.Listen("tcp", c.address)
+			websocketListener, err = net.Listen("tcp", c.websocketAddress)
 			if err != nil {
 				return fmt.Errorf("couldn't listen to %s: %s", c.address, err.Error())
 			}
