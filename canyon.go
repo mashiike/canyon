@@ -139,40 +139,40 @@ func runWithContext(ctx context.Context, mux http.Handler, c *runOptions) error 
 		c.sqsClient = fakeClient
 	}
 
-	m := http.NewServeMux()
-	switch {
-	case c.prefix == "/", c.prefix == "":
-		m.Handle("/", serverHandler)
-	case !strings.HasSuffix(c.prefix, "/"):
-		m.Handle(c.prefix+"/", http.StripPrefix(c.prefix, serverHandler))
-	default:
-		m.Handle(c.prefix, http.StripPrefix(strings.TrimSuffix(c.prefix, "/"), serverHandler))
-	}
-	var listener net.Listener
-	if c.listener == nil {
-		var err error
-		c.logger.InfoContext(ctx, "starting up with local httpd", "address", c.address)
-		listener, err = net.Listen("tcp", c.address)
-		if err != nil {
-			return fmt.Errorf("couldn't listen to %s: %s", c.address, err.Error())
-
-		}
-	} else {
-		listener = c.listener
-		c.address = listener.Addr().String()
-		c.logger.InfoContext(ctx, "starting up with local httpd", "address", listener.Addr().String())
-	}
-	if c.proxyProtocol {
-		c.logger.InfoContext(ctx, "enables to PROXY protocol")
-		listener = &proxyproto.Listener{Listener: listener}
-	}
-	srv := http.Server{Handler: m}
 	var mu sync.Mutex
 	var errs []error
 	var wg sync.WaitGroup
 	cctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 	if !c.disableServer {
+		m := http.NewServeMux()
+		switch {
+		case c.prefix == "/", c.prefix == "":
+			m.Handle("/", serverHandler)
+		case !strings.HasSuffix(c.prefix, "/"):
+			m.Handle(c.prefix+"/", http.StripPrefix(c.prefix, serverHandler))
+		default:
+			m.Handle(c.prefix, http.StripPrefix(strings.TrimSuffix(c.prefix, "/"), serverHandler))
+		}
+		var listener net.Listener
+		if c.listener == nil {
+			var err error
+			c.logger.InfoContext(ctx, "starting up with local httpd", "address", c.address)
+			listener, err = net.Listen("tcp", c.address)
+			if err != nil {
+				return fmt.Errorf("couldn't listen to %s: %s", c.address, err.Error())
+
+			}
+		} else {
+			listener = c.listener
+			c.address = listener.Addr().String()
+			c.logger.InfoContext(ctx, "starting up with local httpd", "address", listener.Addr().String())
+		}
+		if c.proxyProtocol {
+			c.logger.InfoContext(ctx, "enables to PROXY protocol")
+			listener = &proxyproto.Listener{Listener: listener}
+		}
+		srv := http.Server{Handler: m}
 		wg.Add(2)
 		go func() {
 			defer wg.Done()
@@ -220,6 +220,47 @@ func runWithContext(ctx context.Context, mux http.Handler, c *runOptions) error 
 				errs = append(errs, err)
 				mu.Unlock()
 				cancel()
+			}
+		}()
+	}
+	if !c.disableWebsocket && (c.websocketListener != nil || c.websocketAddress != "") {
+		var websocketListener net.Listener
+		if c.websocketListener == nil {
+			var err error
+			c.logger.InfoContext(ctx, "starting up with local websocket server", "address", c.websocketAddress)
+			websocketListener, err = net.Listen("tcp", c.address)
+			if err != nil {
+				return fmt.Errorf("couldn't listen to %s: %s", c.address, err.Error())
+			}
+		} else {
+			websocketListener = c.websocketListener
+			c.websocketAddress = websocketListener.Addr().String()
+			c.logger.InfoContext(ctx, "starting up with local websocket server", "address", websocketListener.Addr().String())
+		}
+		if c.websocketCallbackURL == "" {
+			c.websocketCallbackURL = fmt.Sprintf("http://%s", c.websocketAddress)
+		}
+		bridgeHandler := NewWebsocketHTTPBridgeHandler(serverHandler)
+		wsSrv := http.Server{Handler: bridgeHandler}
+		wg.Add(2)
+		go func() {
+			defer wg.Done()
+			<-cctx.Done()
+			c.logger.InfoContext(cctx, "shutting down local websocket server", "address", c.address)
+			shutdownCtx, timout := context.WithTimeout(context.Background(), 5*time.Second)
+			defer timout()
+			wsSrv.Shutdown(shutdownCtx)
+		}()
+		go func() {
+			defer wg.Done()
+			if err := wsSrv.Serve(websocketListener); err != nil {
+				if !errors.Is(err, http.ErrServerClosed) && !errors.Is(err, context.Canceled) && !errors.Is(err, context.DeadlineExceeded) {
+					c.DebugContextWhenVarbose(cctx, "failed to start local websocket server", "error", err)
+					mu.Lock()
+					errs = append(errs, err)
+					mu.Unlock()
+					cancel()
+				}
 			}
 		}()
 	}

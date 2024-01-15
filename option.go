@@ -44,6 +44,9 @@ type runOptions struct {
 	cancel                             context.CancelCauseFunc
 	address                            string
 	prefix                             string
+	websocketAddress                   string
+	websocketListener                  net.Listener
+	websocketCallbackURL               string
 	batchSize                          int
 	logger                             *slog.Logger
 	proxyProtocol                      bool
@@ -86,7 +89,7 @@ func defaultRunConfig(cancel context.CancelCauseFunc, sqsQueueName string) *runO
 		responseChecker:                    DefaultWorkerResponseChecker,
 		disableWorker:                      false,
 		disableServer:                      false,
-		disableWebsocket:                   true,
+		disableWebsocket:                   false,
 		cleanupFuncs:                       []func(){},
 		lambdaFallbackHandler:              nil,
 		stdin:                              os.Stdin,
@@ -456,5 +459,38 @@ func WithWorkerTimeoutMergin(mergin time.Duration) Option {
 			mergin = 0
 		}
 		c.workerTimeoutMergin = mergin
+	}
+}
+
+// WithWebsocketCallbackURL returns a new Option that sets the websocket callback url.
+// if set this option, canyon websocket connections callback url.
+func WithWebsocketCallbackURL(url string) Option {
+	return func(c *runOptions) {
+		c.websocketCallbackURL = url
+	}
+}
+
+// WithWebsocketListener returns a new Option that sets the websocket listener.
+// this option for testing. normally, you should not use this option.
+// if production used, WithWebsocketAddress() option.
+func WithWebsocketListener(listener net.Listener) Option {
+	return func(c *runOptions) {
+		c.websocketListener = listener
+	}
+}
+
+// WithWebsocketAddress returns a new Option that sets the websocket address.
+// if you want to use proxy protocol, you should use this option.
+func WithWebsocketAddress(address string) Option {
+	return func(c *runOptions) {
+		c.websocketAddress = address
+	}
+}
+
+// WithDisableWebsocket returns a new Option that disable websocket.
+// if set this option, canyon not running websocket.
+func WithDisableWebsocket() Option {
+	return func(c *runOptions) {
+		c.disableWebsocket = true
 	}
 }

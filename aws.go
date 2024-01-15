@@ -24,6 +24,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/aws/arn"
 	"github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/feature/s3/manager"
+	"github.com/aws/aws-sdk-go-v2/service/apigatewaymanagementapi"
 	sdklambda "github.com/aws/aws-sdk-go-v2/service/lambda"
 	lambdatypes "github.com/aws/aws-sdk-go-v2/service/lambda/types"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
@@ -45,6 +46,21 @@ type S3Client interface {
 	manager.UploadAPIClient
 	manager.DownloadAPIClient
 	s3.HeadObjectAPIClient
+}
+
+type ManagementAPIClient interface {
+	PostToConnection(context.Context, *apigatewaymanagementapi.PostToConnectionInput, ...func(*apigatewaymanagementapi.Options)) (*apigatewaymanagementapi.PostToConnectionOutput, error)
+	DeleteConnection(context.Context, *apigatewaymanagementapi.DeleteConnectionInput, ...func(*apigatewaymanagementapi.Options)) (*apigatewaymanagementapi.DeleteConnectionOutput, error)
+	GetConnection(context.Context, *apigatewaymanagementapi.GetConnectionInput, ...func(*apigatewaymanagementapi.Options)) (*apigatewaymanagementapi.GetConnectionOutput, error)
+}
+
+func NewManagementAPIClient(awsCfg aws.Config, endpointURL string) (ManagementAPIClient, error) {
+	if endpointURL == "" {
+		return nil, errors.New("endpoint url is required")
+	}
+	return apigatewaymanagementapi.NewFromConfig(awsCfg, func(o *apigatewaymanagementapi.Options) {
+		o.BaseEndpoint = aws.String(endpointURL)
+	}), nil
 }
 
 type sqsLongPollingService struct {

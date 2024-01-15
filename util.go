@@ -19,6 +19,7 @@ import (
 	"github.com/aws/aws-lambda-go/events"
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/aws/arn"
+	"github.com/fujiwara/ridge"
 	"golang.org/x/text/cases"
 	"golang.org/x/text/language"
 )
@@ -221,6 +222,10 @@ func randomBytes(n int) []byte {
 	return bs
 }
 
+func randomBase64String(n int) string {
+	return base64.URLEncoding.EncodeToString(randomBytes(n))
+}
+
 func md5Digest(s string) string {
 	return fmt.Sprintf("%x", md5.Sum([]byte(s)))
 }
@@ -337,4 +342,36 @@ func sqsQueueURLToArn(rawURL string) (string, error) {
 		Resource:  parts[2],
 	}.String()
 	return arnStr, nil
+}
+
+func isBinary(header http.Header) bool {
+	ct := header.Get("Content-Type")
+	if ct != "" && !isTextMime(ct) {
+		return true
+	}
+	ce := header.Get("Content-Encoding")
+	if ce != "" && ce == "gzip" {
+		return true
+	}
+	return false
+}
+
+func isTextMime(kind string) bool {
+	mt, _, err := mime.ParseMediaType(kind)
+	if err != nil {
+		return false
+	}
+
+	if strings.HasPrefix(mt, "text/") {
+		return true
+	}
+
+	isText := false
+	for _, tmt := range ridge.TextMimeTypes {
+		if mt == tmt {
+			isText = true
+			break
+		}
+	}
+	return isText
 }
