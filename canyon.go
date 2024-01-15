@@ -377,6 +377,15 @@ func newWorkerHandler(mux http.Handler, c *runOptions) sqsEventLambdaHandlerFunc
 	if s, ok := serializer.(LoggingableSerializer); ok && c.logVarbose {
 		serializer = s.WithLogger(logger)
 	}
+	wraped := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		ctx := r.Context()
+		if client, err := NewManagementAPIClientWithRequest(r, c.websocketCallbackURL); err == nil {
+			ctx = EmbedWebsocketManagementAPIClient(ctx, client)
+		} else {
+			logger.DebugContext(ctx, "websocket management api client not found in request", "error", err)
+		}
+		mux.ServeHTTP(w, r.WithContext(ctx))
+	})
 	var once sync.Once
 	var visibilityTimeout time.Duration = -1 * time.Second
 	var sqsClient SQSClient
@@ -459,7 +468,7 @@ func newWorkerHandler(mux http.Handler, c *runOptions) sqsEventLambdaHandlerFunc
 				}
 				embededCtx := EmbedIsWorkerInContext(ctx, true)
 				embededCtx = embedLoggerInContext(embededCtx, _logger)
-				mux.ServeHTTP(w, r.WithContext(embededCtx))
+				wraped.ServeHTTP(w, r.WithContext(embededCtx))
 				workerResp := w.Response(r)
 				if c.responseChecker.IsFailure(ctx, workerResp) {
 					_logger.ErrorContext(
@@ -528,6 +537,11 @@ func newServerHandler(mux http.Handler, c *runOptions) http.Handler {
 	sender := newWorkerSender(mux, serializer, c)
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		ctx := r.Context()
+		if client, err := NewManagementAPIClientWithRequest(r, c.websocketCallbackURL); err == nil {
+			ctx = EmbedWebsocketManagementAPIClient(ctx, client)
+		} else {
+			logger.DebugContext(ctx, "websocket management api client not found in request", "error", err)
+		}
 		ctx = embedLoggerInContext(ctx, logger)
 		ctx = EmbedIsWorkerInContext(ctx, false)
 		ctx = EmbedWorkerSenderInContext(ctx, sender)

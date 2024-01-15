@@ -63,6 +63,25 @@ func NewManagementAPIClient(awsCfg aws.Config, endpointURL string) (ManagementAP
 	}), nil
 }
 
+func NewManagementAPIClientWithRequest(req *http.Request, endpointURL string) (ManagementAPIClient, error) {
+	awsCfg, err := getDefaultAWSConfig()
+	if err != nil {
+		return nil, err
+	}
+	if endpointURL == "" {
+		appID := req.Header.Get(HeaderAPIGatewayWebsocketAPIID)
+		if appID == "" {
+			return nil, errors.New("missing app id")
+		}
+		stage := req.Header.Get(HeaderAPIGatewayWebsocketStage)
+		if stage == "" {
+			return nil, errors.New("missing stage")
+		}
+		endpointURL = fmt.Sprintf("https://%s.execute-api.%s.amazonaws.com/%s", appID, awsCfg.Region, stage)
+	}
+	return NewManagementAPIClient(awsCfg, endpointURL)
+}
+
 var (
 	defaultAWSConfig   *aws.Config
 	defaultAWSConfigMu sync.Mutex
