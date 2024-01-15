@@ -14,7 +14,6 @@ import (
 	"time"
 
 	"github.com/aws/aws-lambda-go/lambda"
-	"github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/service/sqs"
 )
 
@@ -112,7 +111,7 @@ func (c *runOptions) SQSClientAndQueueURL() (string, SQSClient) {
 	defer c.mu.Unlock()
 	if c.sqsClient == nil {
 		c.DebugWhenVarbose("sqs client is not initialized, try to load default config")
-		awsCfg, err := config.LoadDefaultConfig(context.Background())
+		awsCfg, err := getDefaultAWSConfig()
 		if err != nil {
 			c.DebugWhenVarbose("failed to load aws default config, set context cancel", "error", err)
 			c.cancel(fmt.Errorf("load aws default config: %w", err))

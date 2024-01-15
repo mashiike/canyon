@@ -11,7 +11,6 @@ import (
 	"github.com/Songmu/flextime"
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/aws/arn"
-	"github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/service/scheduler"
 	"github.com/aws/aws-sdk-go-v2/service/scheduler/types"
 	"github.com/aws/aws-sdk-go-v2/service/sqs"
@@ -78,7 +77,7 @@ func (s *EventBridgeScheduler) get(ctx context.Context) (string, EventBridgeSche
 	if s.iamRoleARN != "" && s.client != nil {
 		return s.iamRoleARN, s.client, nil
 	}
-	awsCfg, err := config.LoadDefaultConfig(ctx)
+	awsCfg, err := getDefaultAWSConfig()
 	if err != nil {
 		return "", nil, fmt.Errorf("failed to load aws config: %w", err)
 	}

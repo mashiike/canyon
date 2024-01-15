@@ -63,6 +63,31 @@ func NewManagementAPIClient(awsCfg aws.Config, endpointURL string) (ManagementAP
 	}), nil
 }
 
+var (
+	defaultAWSConfig   *aws.Config
+	defaultAWSConfigMu sync.Mutex
+)
+
+func SetDefaultAWSConfig(cfg *aws.Config) {
+	defaultAWSConfigMu.Lock()
+	defer defaultAWSConfigMu.Unlock()
+	defaultAWSConfig = cfg
+}
+
+func getDefaultAWSConfig() (aws.Config, error) {
+	defaultAWSConfigMu.Lock()
+	defer defaultAWSConfigMu.Unlock()
+	if defaultAWSConfig != nil {
+		return *defaultAWSConfig, nil
+	}
+	cfg, err := config.LoadDefaultConfig(context.Background())
+	if err != nil {
+		return *aws.NewConfig(), err
+	}
+	defaultAWSConfig = &cfg
+	return *defaultAWSConfig, nil
+}
+
 type sqsLongPollingService struct {
 	sqsClient           SQSClient
 	queueURL            string
@@ -566,7 +591,7 @@ func NewS3Backend(s3URLPrefix string) (*S3Backend, error) {
 func (b *S3Backend) init() {
 	b.once.Do(func() {
 		if b.s3Client == nil {
-			awsCfg, err := config.LoadDefaultConfig(context.Background())
+			awsCfg, err := getDefaultAWSConfig()
 			if err != nil {
 				b.initErr = err
 			}
@@ -684,7 +709,7 @@ func checkFunctionResponseTypes(ctx context.Context, c *runOptions) {
 		}
 	}()
 
-	awsCfg, err := config.LoadDefaultConfig(ctx)
+	awsCfg, err := getDefaultAWSConfig()
 	if err != nil {
 		return
 	}

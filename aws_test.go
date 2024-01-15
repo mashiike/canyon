@@ -16,7 +16,6 @@ import (
 	"github.com/Songmu/flextime"
 	"github.com/aws/aws-lambda-go/events"
 	"github.com/aws/aws-sdk-go-v2/aws"
-	"github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 	"github.com/aws/aws-sdk-go-v2/service/sqs"
 	"github.com/aws/aws-sdk-go-v2/service/sqs/types"
@@ -224,7 +223,7 @@ func TestSQSLongPollingService__WithAWS(t *testing.T) {
 		t.Log("Logs\n", logs.String())
 	})
 	logger := slog.New(slog.NewJSONHandler(&logs, &slog.HandlerOptions{Level: slog.LevelDebug}))
-	awsCfg, err := config.LoadDefaultConfig(context.Background())
+	awsCfg, err := getDefaultAWSConfig()
 	require.NoError(t, err, "should load aws default config")
 	client := sqs.NewFromConfig(awsCfg)
 	getQueueUrl, err := client.GetQueueUrl(context.Background(), &sqs.GetQueueUrlInput{
