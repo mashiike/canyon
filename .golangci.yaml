@@ -8,25 +8,17 @@ issues:
         - gocyclo
 
 linters:
+  disable-all: true
   enable:
     - gocyclo
     - staticcheck
     - govet
-  disable:
-    - maligned
-    - exhaustive
-    - noctx
-    - asciicheck
-    - sqlclosecheck
-    - rowserrcheck
-    - gosec
-    - scopelint
-    - revive
-    - contextcheck
+    - errcheck
   presets:
     - bugs
     - unused
     - format
+  fast: false
 
 linters-settings:
   gocyclo:
