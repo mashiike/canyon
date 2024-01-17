@@ -1,0 +1,22 @@
+{
+  "requestContext": {
+      "routeKey": "$default",
+      "messageId": "Qj5E_f7mNjMCI3w=",
+      "eventType": "MESSAGE",
+      "extendedRequestId": "YYYYYYYYYYZ=",
+      "requestTime": "26/Dec/2023:17:08:22 +0000",
+      "messageDirection": "IN",
+      "stage": "develop",
+      "connectedAt": 1703610495030,
+      "requestTimeEpoch": 1703610502005,
+      "identity": {
+          "sourceIp": "192.168.1.1"
+      },
+      "requestId": "YYYYYYYYYYZ=",
+      "domainName": "abcdefghij.execute-api.ap-northeast-1.amazonaws.com",
+      "connectionId": "ZZZZZZZZZZZZZZZ=",
+      "apiId": "abcdefghij"
+  },
+  "body": "{\"abc\":\"def\"}",
+  "isBase64Encoded": false
+}

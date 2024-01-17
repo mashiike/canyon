@@ -121,6 +121,7 @@ func TestE2E__HandlerReadBody(t *testing.T) {
 				return
 			}
 			workerBody, err = io.ReadAll(r.Body)
+			require.NoError(t, err, "should read body")
 			w.WriteHeader(http.StatusOK)
 			wg.Done()
 		}),

@@ -82,7 +82,7 @@ func runWithContext(ctx context.Context, mux http.Handler, c *runOptions) error 
 					}
 					return nil, err
 				}
-				if p.IsSQSEvent && !c.disableWorker {
+				if p.IsSQSEvent {
 					if len(p.SQSEvent.Records) > 1 {
 						onceCheckFunctionResponseTypes.Do(func() {
 							checkFunctionResponseTypes(ctx, c)
@@ -104,12 +104,19 @@ func runWithContext(ctx context.Context, mux http.Handler, c *runOptions) error 
 					}
 					return resp, nil
 				}
-				if p.IsHTTPEvent && !c.disableServer {
+				if p.IsHTTPEvent {
 					r := p.Request.WithContext(ctx)
 					w := ridge.NewResponseWriter()
 					serverHandler.ServeHTTP(w, r)
 					return w.Response(), nil
 				}
+				if p.IsWebsocketProxyEvent {
+					r := p.Request.WithContext(ctx)
+					w := ridge.NewResponseWriter()
+					serverHandler.ServeHTTP(w, r)
+					return w.Response(), nil
+				}
+
 				if lambdaFallbackHandler != nil {
 					return lambdaFallbackHandler.Invoke(ctx, event)
 				}
@@ -132,40 +139,40 @@ func runWithContext(ctx context.Context, mux http.Handler, c *runOptions) error 
 		c.sqsClient = fakeClient
 	}
 
-	m := http.NewServeMux()
-	switch {
-	case c.prefix == "/", c.prefix == "":
-		m.Handle("/", serverHandler)
-	case !strings.HasSuffix(c.prefix, "/"):
-		m.Handle(c.prefix+"/", http.StripPrefix(c.prefix, serverHandler))
-	default:
-		m.Handle(c.prefix, http.StripPrefix(strings.TrimSuffix(c.prefix, "/"), serverHandler))
-	}
-	var listener net.Listener
-	if c.listener == nil {
-		var err error
-		c.logger.InfoContext(ctx, "starting up with local httpd", "address", c.address)
-		listener, err = net.Listen("tcp", c.address)
-		if err != nil {
-			return fmt.Errorf("couldn't listen to %s: %s", c.address, err.Error())
-
-		}
-	} else {
-		listener = c.listener
-		c.address = listener.Addr().String()
-		c.logger.InfoContext(ctx, "starting up with local httpd", "address", listener.Addr().String())
-	}
-	if c.proxyProtocol {
-		c.logger.InfoContext(ctx, "enables to PROXY protocol")
-		listener = &proxyproto.Listener{Listener: listener}
-	}
-	srv := http.Server{Handler: m}
 	var mu sync.Mutex
 	var errs []error
 	var wg sync.WaitGroup
 	cctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 	if !c.disableServer {
+		m := http.NewServeMux()
+		switch {
+		case c.prefix == "/", c.prefix == "":
+			m.Handle("/", serverHandler)
+		case !strings.HasSuffix(c.prefix, "/"):
+			m.Handle(c.prefix+"/", http.StripPrefix(c.prefix, serverHandler))
+		default:
+			m.Handle(c.prefix, http.StripPrefix(strings.TrimSuffix(c.prefix, "/"), serverHandler))
+		}
+		var listener net.Listener
+		if c.listener == nil {
+			var err error
+			c.logger.InfoContext(ctx, "starting up with local httpd", "address", c.address)
+			listener, err = net.Listen("tcp", c.address)
+			if err != nil {
+				return fmt.Errorf("couldn't listen to %s: %s", c.address, err.Error())
+
+			}
+		} else {
+			listener = c.listener
+			c.address = listener.Addr().String()
+			c.logger.InfoContext(ctx, "starting up with local httpd", "address", listener.Addr().String())
+		}
+		if c.proxyProtocol {
+			c.logger.InfoContext(ctx, "enables to PROXY protocol")
+			listener = &proxyproto.Listener{Listener: listener}
+		}
+		srv := http.Server{Handler: m}
 		wg.Add(2)
 		go func() {
 			defer wg.Done()
@@ -213,6 +220,47 @@ func runWithContext(ctx context.Context, mux http.Handler, c *runOptions) error 
 				errs = append(errs, err)
 				mu.Unlock()
 				cancel()
+			}
+		}()
+	}
+	if !c.disableWebsocket && (c.websocketListener != nil || c.websocketAddress != "") {
+		var websocketListener net.Listener
+		if c.websocketListener == nil {
+			var err error
+			c.logger.InfoContext(ctx, "starting up with local websocket server", "address", c.websocketAddress)
+			websocketListener, err = net.Listen("tcp", c.websocketAddress)
+			if err != nil {
+				return fmt.Errorf("couldn't listen to %s: %s", c.address, err.Error())
+			}
+		} else {
+			websocketListener = c.websocketListener
+			c.websocketAddress = websocketListener.Addr().String()
+			c.logger.InfoContext(ctx, "starting up with local websocket server", "address", websocketListener.Addr().String())
+		}
+		if c.websocketCallbackURL == "" {
+			c.websocketCallbackURL = fmt.Sprintf("http://%s", c.websocketAddress)
+		}
+		bridgeHandler := NewWebsocketHTTPBridgeHandler(serverHandler)
+		wsSrv := http.Server{Handler: bridgeHandler}
+		wg.Add(2)
+		go func() {
+			defer wg.Done()
+			<-cctx.Done()
+			c.logger.InfoContext(cctx, "shutting down local websocket server", "address", c.address)
+			shutdownCtx, timout := context.WithTimeout(context.Background(), 5*time.Second)
+			defer timout()
+			wsSrv.Shutdown(shutdownCtx)
+		}()
+		go func() {
+			defer wg.Done()
+			if err := wsSrv.Serve(websocketListener); err != nil {
+				if !errors.Is(err, http.ErrServerClosed) && !errors.Is(err, context.Canceled) && !errors.Is(err, context.DeadlineExceeded) {
+					c.DebugContextWhenVarbose(cctx, "failed to start local websocket server", "error", err)
+					mu.Lock()
+					errs = append(errs, err)
+					mu.Unlock()
+					cancel()
+				}
 			}
 		}()
 	}
@@ -329,6 +377,15 @@ func newWorkerHandler(mux http.Handler, c *runOptions) sqsEventLambdaHandlerFunc
 	if s, ok := serializer.(LoggingableSerializer); ok && c.logVarbose {
 		serializer = s.WithLogger(logger)
 	}
+	wraped := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		ctx := r.Context()
+		if client, err := NewManagementAPIClientWithRequest(r, c.websocketCallbackURL); err == nil {
+			ctx = EmbedWebsocketManagementAPIClient(ctx, client)
+		} else {
+			logger.DebugContext(ctx, "websocket management api client not found in request", "error", err)
+		}
+		mux.ServeHTTP(w, r.WithContext(ctx))
+	})
 	var once sync.Once
 	var visibilityTimeout time.Duration = -1 * time.Second
 	var sqsClient SQSClient
@@ -411,7 +468,7 @@ func newWorkerHandler(mux http.Handler, c *runOptions) sqsEventLambdaHandlerFunc
 				}
 				embededCtx := EmbedIsWorkerInContext(ctx, true)
 				embededCtx = embedLoggerInContext(embededCtx, _logger)
-				mux.ServeHTTP(w, r.WithContext(embededCtx))
+				wraped.ServeHTTP(w, r.WithContext(embededCtx))
 				workerResp := w.Response(r)
 				if c.responseChecker.IsFailure(ctx, workerResp) {
 					_logger.ErrorContext(
@@ -480,6 +537,11 @@ func newServerHandler(mux http.Handler, c *runOptions) http.Handler {
 	sender := newWorkerSender(mux, serializer, c)
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		ctx := r.Context()
+		if client, err := NewManagementAPIClientWithRequest(r, c.websocketCallbackURL); err == nil {
+			ctx = EmbedWebsocketManagementAPIClient(ctx, client)
+		} else {
+			logger.DebugContext(ctx, "websocket management api client not found in request", "error", err)
+		}
 		ctx = embedLoggerInContext(ctx, logger)
 		ctx = EmbedIsWorkerInContext(ctx, false)
 		ctx = EmbedWorkerSenderInContext(ctx, sender)

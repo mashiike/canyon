@@ -55,6 +55,17 @@ func AsServer(next http.Handler, sender canyon.WorkerSender) http.Handler {
 	})
 }
 
+// AsWebsocket returns http.Handler that embeds logger and sqs message sender in context.
+func AsWebsocket(next http.Handler, reqCtx events.APIGatewayWebsocketProxyRequestContext, sender canyon.WorkerSender) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		ctx := canyon.EmbedIsWorkerInContext(r.Context(), false)
+		ctx = canyon.EmbedWorkerSenderInContext(ctx, sender)
+		r = canyon.SetAPIGatewayWebsocketProxyHeader(r, &reqCtx)
+		next.ServeHTTP(w, r.WithContext(ctx))
+	})
+}
+
+// AsLambdaFallback returns lambda.Handler that embeds logger and sqs message sender in context.
 func AsLambdaFallback(next lambda.Handler, sender canyon.WorkerSender) lambda.Handler {
 	return canyon.LambdaHandlerFunc(
 		func(ctx context.Context, event []byte) ([]byte, error) {

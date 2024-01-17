@@ -16,7 +16,6 @@ import (
 	"github.com/Songmu/flextime"
 	"github.com/aws/aws-lambda-go/events"
 	"github.com/aws/aws-sdk-go-v2/aws"
-	"github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 	"github.com/aws/aws-sdk-go-v2/service/sqs"
 	"github.com/aws/aws-sdk-go-v2/service/sqs/types"
@@ -224,17 +223,17 @@ func TestSQSLongPollingService__WithAWS(t *testing.T) {
 		t.Log("Logs\n", logs.String())
 	})
 	logger := slog.New(slog.NewJSONHandler(&logs, &slog.HandlerOptions{Level: slog.LevelDebug}))
-	awsCfg, err := config.LoadDefaultConfig(context.Background())
+	awsCfg, err := getDefaultAWSConfig(context.Background())
 	require.NoError(t, err, "should load aws default config")
 	client := sqs.NewFromConfig(awsCfg)
-	getQueueUrl, err := client.GetQueueUrl(context.Background(), &sqs.GetQueueUrlInput{
+	getQueueURL, err := client.GetQueueUrl(context.Background(), &sqs.GetQueueUrlInput{
 		QueueName: aws.String(queueName),
 	})
 	require.NoError(t, err, "should get queue url")
 	svc := &sqsLongPollingService{
 		sqsClient:           client,
 		logger:              logger,
-		queueURL:            *getQueueUrl.QueueUrl,
+		queueURL:            *getQueueURL.QueueUrl,
 		maxDeleteRetry:      3,
 		waitTimeSeconds:     1,
 		maxNumberObMessages: 1,
@@ -370,7 +369,7 @@ func TestS3BackendLoadRequestBody(t *testing.T) {
 			require.Equal(t, "my-bucket", *input.Bucket)
 			require.Equal(t, "my-prefix/my-object/data.bin", *input.Key)
 			return &s3.HeadObjectOutput{
-				ContentLength: int64(len(body)),
+				ContentLength: aws.Int64(int64(len(body))),
 			}, nil
 		},
 		GetObjectFunc: func(_ context.Context, input *s3.GetObjectInput, _ ...func(*s3.Options)) (*s3.GetObjectOutput, error) {
@@ -378,7 +377,7 @@ func TestS3BackendLoadRequestBody(t *testing.T) {
 			require.Equal(t, "my-prefix/my-object/data.bin", *input.Key)
 			return &s3.GetObjectOutput{
 				Body:          io.NopCloser(strings.NewReader(body)),
-				ContentLength: int64(len(body)),
+				ContentLength: aws.Int64(int64(len(body))),
 			}, nil
 		},
 	})
@@ -390,5 +389,6 @@ func TestS3BackendLoadRequestBody(t *testing.T) {
 	})
 	require.NoError(t, err, "should load request body")
 	actual, err := io.ReadAll(actualReader)
+	require.NoError(t, err, "should read body")
 	require.Equal(t, body, string(actual), "should save request body")
 }

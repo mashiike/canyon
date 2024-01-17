@@ -19,6 +19,7 @@ import (
 	"github.com/aws/aws-lambda-go/events"
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/aws/arn"
+	"github.com/fujiwara/ridge"
 	"golang.org/x/text/cases"
 	"golang.org/x/text/language"
 )
@@ -182,6 +183,38 @@ func SetSQSMessageHeader(r *http.Request, message *events.SQSMessage) *http.Requ
 	return r
 }
 
+// API Gateway Websocket Proxy headers
+const (
+	HeaderAPIGatewayWebsocketConnectionID = "Api-Gateway-Websocket-Connection-Id"
+	HeaderAPIGatewayWebsocketRouteKey     = "Api-Gateway-Websocket-Route-Key"
+	HeaderAPIGatewayWebsocketAPIID        = "Api-Gateway-Websocket-Api-Id"
+	HeaderAPIGatewayWebsocketStage        = "Api-Gateway-Websocket-Stage"
+)
+
+// SetAPIGatewayWebsocketProxyHeader sets API Gateway Websocket Proxy headers to Request
+func SetAPIGatewayWebsocketProxyHeader(r *http.Request, reqCtx *events.APIGatewayWebsocketProxyRequestContext) *http.Request {
+	r.Header.Set(HeaderAPIGatewayWebsocketConnectionID, reqCtx.ConnectionID)
+	r.Header.Set(HeaderAPIGatewayWebsocketRouteKey, reqCtx.RouteKey)
+	r.Header.Set(HeaderAPIGatewayWebsocketAPIID, reqCtx.APIID)
+	r.Header.Set(HeaderAPIGatewayWebsocketStage, reqCtx.Stage)
+	return r
+}
+
+// WebsocketRouteKey returns route key from API Gateway Websocket Proxy headers.
+func WebsocketRouteKey(r *http.Request) string {
+	return r.Header.Get(HeaderAPIGatewayWebsocketRouteKey)
+}
+
+// WebsocketConnectionID returns connection id from API Gateway Websocket Proxy headers.
+func WebsocketConnectionID(r *http.Request) string {
+	return r.Header.Get(HeaderAPIGatewayWebsocketConnectionID)
+}
+
+// IsWebsocket returns true if the request is from websocket proxy.
+func IsWebsocket(r *http.Request) bool {
+	return WebsocketRouteKey(r) != "" && WebsocketConnectionID(r) != ""
+}
+
 var randomReader = rand.New(rand.NewSource(time.Now().UnixNano()))
 
 func randomBytes(n int) []byte {
@@ -191,6 +224,10 @@ func randomBytes(n int) []byte {
 		panic(err)
 	}
 	return bs
+}
+
+func randomBase64String(n int) string {
+	return base64.URLEncoding.EncodeToString(randomBytes(n))
 }
 
 func md5Digest(s string) string {
@@ -213,9 +250,7 @@ func ToMessageAttributes(h http.Header) map[string]MessageAttributeValue {
 			continue
 		}
 		sl := make([]string, len(v))
-		for i, s := range v {
-			sl[i] = s
-		}
+		copy(sl, v)
 		m[k] = MessageAttributeValue{
 			DataType:         "String",
 			StringListValues: sl,
@@ -311,4 +346,36 @@ func sqsQueueURLToArn(rawURL string) (string, error) {
 		Resource:  parts[2],
 	}.String()
 	return arnStr, nil
+}
+
+func isBinary(header http.Header) bool {
+	ct := header.Get("Content-Type")
+	if ct != "" && !isTextMime(ct) {
+		return true
+	}
+	ce := header.Get("Content-Encoding")
+	if ce != "" && ce == "gzip" {
+		return true
+	}
+	return false
+}
+
+func isTextMime(kind string) bool {
+	mt, _, err := mime.ParseMediaType(kind)
+	if err != nil {
+		return false
+	}
+
+	if strings.HasPrefix(mt, "text/") {
+		return true
+	}
+
+	isText := false
+	for _, tmt := range ridge.TextMimeTypes {
+		if mt == tmt {
+			isText = true
+			break
+		}
+	}
+	return isText
 }

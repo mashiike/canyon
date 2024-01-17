@@ -14,7 +14,6 @@ import (
 	"time"
 
 	"github.com/aws/aws-lambda-go/lambda"
-	"github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/service/sqs"
 )
 
@@ -44,6 +43,9 @@ type runOptions struct {
 	cancel                             context.CancelCauseFunc
 	address                            string
 	prefix                             string
+	websocketAddress                   string
+	websocketListener                  net.Listener
+	websocketCallbackURL               string
 	batchSize                          int
 	logger                             *slog.Logger
 	proxyProtocol                      bool
@@ -61,6 +63,7 @@ type runOptions struct {
 	responseChecker                    WorkerResponseChecker
 	disableWorker                      bool
 	disableServer                      bool
+	disableWebsocket                   bool
 	cleanupFuncs                       []func()
 	lambdaFallbackHandler              lambda.Handler
 	stdin                              io.Reader
@@ -85,6 +88,7 @@ func defaultRunConfig(cancel context.CancelCauseFunc, sqsQueueName string) *runO
 		responseChecker:                    DefaultWorkerResponseChecker,
 		disableWorker:                      false,
 		disableServer:                      false,
+		disableWebsocket:                   false,
 		cleanupFuncs:                       []func(){},
 		lambdaFallbackHandler:              nil,
 		stdin:                              os.Stdin,
@@ -107,7 +111,7 @@ func (c *runOptions) SQSClientAndQueueURL() (string, SQSClient) {
 	defer c.mu.Unlock()
 	if c.sqsClient == nil {
 		c.DebugWhenVarbose("sqs client is not initialized, try to load default config")
-		awsCfg, err := config.LoadDefaultConfig(context.Background())
+		awsCfg, err := getDefaultAWSConfig(context.Background())
 		if err != nil {
 			c.DebugWhenVarbose("failed to load aws default config, set context cancel", "error", err)
 			c.cancel(fmt.Errorf("load aws default config: %w", err))
@@ -454,5 +458,38 @@ func WithWorkerTimeoutMergin(mergin time.Duration) Option {
 			mergin = 0
 		}
 		c.workerTimeoutMergin = mergin
+	}
+}
+
+// WithWebsocketCallbackURL returns a new Option that sets the websocket callback url.
+// if set this option, canyon websocket connections callback url.
+func WithWebsocketCallbackURL(url string) Option {
+	return func(c *runOptions) {
+		c.websocketCallbackURL = url
+	}
+}
+
+// WithWebsocketListener returns a new Option that sets the websocket listener.
+// this option for testing. normally, you should not use this option.
+// if production used, WithWebsocketAddress() option.
+func WithWebsocketListener(listener net.Listener) Option {
+	return func(c *runOptions) {
+		c.websocketListener = listener
+	}
+}
+
+// WithWebsocketAddress returns a new Option that sets the websocket address.
+// if you want to use proxy protocol, you should use this option.
+func WithWebsocketAddress(address string) Option {
+	return func(c *runOptions) {
+		c.websocketAddress = address
+	}
+}
+
+// WithDisableWebsocket returns a new Option that disable websocket.
+// if set this option, canyon not running websocket.
+func WithDisableWebsocket() Option {
+	return func(c *runOptions) {
+		c.disableWebsocket = true
 	}
 }

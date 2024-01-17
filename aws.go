@@ -24,6 +24,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/aws/arn"
 	"github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/feature/s3/manager"
+	"github.com/aws/aws-sdk-go-v2/service/apigatewaymanagementapi"
 	sdklambda "github.com/aws/aws-sdk-go-v2/service/lambda"
 	lambdatypes "github.com/aws/aws-sdk-go-v2/service/lambda/types"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
@@ -32,6 +33,7 @@ import (
 	"github.com/google/uuid"
 )
 
+// SQSClient is a client for SQS.
 type SQSClient interface {
 	SendMessage(ctx context.Context, params *sqs.SendMessageInput, optFns ...func(*sqs.Options)) (*sqs.SendMessageOutput, error)
 	ReceiveMessage(ctx context.Context, params *sqs.ReceiveMessageInput, optFns ...func(*sqs.Options)) (*sqs.ReceiveMessageOutput, error)
@@ -41,10 +43,73 @@ type SQSClient interface {
 	ChangeMessageVisibilityBatch(ctx context.Context, params *sqs.ChangeMessageVisibilityBatchInput, optFns ...func(*sqs.Options)) (*sqs.ChangeMessageVisibilityBatchOutput, error)
 }
 
+// S3Client is a client for S3.
 type S3Client interface {
 	manager.UploadAPIClient
 	manager.DownloadAPIClient
 	s3.HeadObjectAPIClient
+}
+
+// ManagmentAPIBackend is a backend for sending message to websocket connection using Amazon API Gateway Management API.
+type ManagementAPIClient interface {
+	PostToConnection(context.Context, *apigatewaymanagementapi.PostToConnectionInput, ...func(*apigatewaymanagementapi.Options)) (*apigatewaymanagementapi.PostToConnectionOutput, error)
+	DeleteConnection(context.Context, *apigatewaymanagementapi.DeleteConnectionInput, ...func(*apigatewaymanagementapi.Options)) (*apigatewaymanagementapi.DeleteConnectionOutput, error)
+	GetConnection(context.Context, *apigatewaymanagementapi.GetConnectionInput, ...func(*apigatewaymanagementapi.Options)) (*apigatewaymanagementapi.GetConnectionOutput, error)
+}
+
+// NewManagementAPIClient creates a new ManagementAPIClient.
+func NewManagementAPIClient(awsCfg aws.Config, endpointURL string) (ManagementAPIClient, error) {
+	if endpointURL == "" {
+		return nil, errors.New("endpoint url is required")
+	}
+	return apigatewaymanagementapi.NewFromConfig(awsCfg, func(o *apigatewaymanagementapi.Options) {
+		o.BaseEndpoint = aws.String(endpointURL)
+	}), nil
+}
+
+// NewManagementAPIClientWithRequest creates a new ManagementAPIClient with request.
+func NewManagementAPIClientWithRequest(req *http.Request, endpointURL string) (ManagementAPIClient, error) {
+	awsCfg, err := getDefaultAWSConfig(context.Background())
+	if err != nil {
+		return nil, err
+	}
+	if endpointURL == "" {
+		appID := req.Header.Get(HeaderAPIGatewayWebsocketAPIID)
+		if appID == "" {
+			return nil, errors.New("missing app id")
+		}
+		stage := req.Header.Get(HeaderAPIGatewayWebsocketStage)
+		if stage == "" {
+			return nil, errors.New("missing stage")
+		}
+		endpointURL = fmt.Sprintf("https://%s.execute-api.%s.amazonaws.com/%s", appID, awsCfg.Region, stage)
+	}
+	return NewManagementAPIClient(awsCfg, endpointURL)
+}
+
+var (
+	defaultAWSConfig   *aws.Config
+	defaultAWSConfigMu sync.Mutex
+)
+
+func SetDefaultAWSConfig(cfg *aws.Config) {
+	defaultAWSConfigMu.Lock()
+	defer defaultAWSConfigMu.Unlock()
+	defaultAWSConfig = cfg
+}
+
+func getDefaultAWSConfig(ctx context.Context) (aws.Config, error) {
+	defaultAWSConfigMu.Lock()
+	defer defaultAWSConfigMu.Unlock()
+	if defaultAWSConfig != nil {
+		return *defaultAWSConfig, nil
+	}
+	cfg, err := config.LoadDefaultConfig(ctx)
+	if err != nil {
+		return *aws.NewConfig(), err
+	}
+	defaultAWSConfig = &cfg
+	return *defaultAWSConfig, nil
 }
 
 type sqsLongPollingService struct {
@@ -550,7 +615,7 @@ func NewS3Backend(s3URLPrefix string) (*S3Backend, error) {
 func (b *S3Backend) init() {
 	b.once.Do(func() {
 		if b.s3Client == nil {
-			awsCfg, err := config.LoadDefaultConfig(context.Background())
+			awsCfg, err := getDefaultAWSConfig(context.Background())
 			if err != nil {
 				b.initErr = err
 			}
@@ -642,7 +707,7 @@ func (b *S3Backend) LoadRequestBody(ctx context.Context, u *url.URL) (io.ReadClo
 	if err != nil {
 		return nil, fmt.Errorf("failed to head object: %w", err)
 	}
-	buf := manager.NewWriteAtBuffer(make([]byte, head.ContentLength))
+	buf := manager.NewWriteAtBuffer(make([]byte, *head.ContentLength))
 	_, err = b.downloader.Download(context.Background(), buf, &s3.GetObjectInput{
 		Bucket: aws.String(u.Host),
 		Key:    aws.String(objectKey),
@@ -650,7 +715,7 @@ func (b *S3Backend) LoadRequestBody(ctx context.Context, u *url.URL) (io.ReadClo
 	if err != nil {
 		return nil, fmt.Errorf("failed to download request: %w", err)
 	}
-	objectBody := buf.Bytes()[:head.ContentLength]
+	objectBody := buf.Bytes()[:*head.ContentLength]
 	return io.NopCloser(bytes.NewReader(objectBody)), nil
 }
 
@@ -668,7 +733,7 @@ func checkFunctionResponseTypes(ctx context.Context, c *runOptions) {
 		}
 	}()
 
-	awsCfg, err := config.LoadDefaultConfig(ctx)
+	awsCfg, err := getDefaultAWSConfig(context.Background())
 	if err != nil {
 		return
 	}

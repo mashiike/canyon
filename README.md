@@ -66,7 +66,7 @@ func handler(w http.ResponseWriter, r *http.Request) {
 }
 ```
 
-example lambda function in [lambda/](lambda/) directory.
+example lambda function in [lambda/simple](lambda/simple) directory.
 
 ### canyon.RunWithContext(ctx, sqs_queue_name, handler, opts...)
 
