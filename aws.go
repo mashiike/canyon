@@ -64,7 +64,7 @@ func NewManagementAPIClient(awsCfg aws.Config, endpointURL string) (ManagementAP
 }
 
 func NewManagementAPIClientWithRequest(req *http.Request, endpointURL string) (ManagementAPIClient, error) {
-	awsCfg, err := getDefaultAWSConfig()
+	awsCfg, err := getDefaultAWSConfig(context.Background())
 	if err != nil {
 		return nil, err
 	}
@@ -93,13 +93,13 @@ func SetDefaultAWSConfig(cfg *aws.Config) {
 	defaultAWSConfig = cfg
 }
 
-func getDefaultAWSConfig() (aws.Config, error) {
+func getDefaultAWSConfig(ctx context.Context) (aws.Config, error) {
 	defaultAWSConfigMu.Lock()
 	defer defaultAWSConfigMu.Unlock()
 	if defaultAWSConfig != nil {
 		return *defaultAWSConfig, nil
 	}
-	cfg, err := config.LoadDefaultConfig(context.Background())
+	cfg, err := config.LoadDefaultConfig(ctx)
 	if err != nil {
 		return *aws.NewConfig(), err
 	}
@@ -610,7 +610,7 @@ func NewS3Backend(s3URLPrefix string) (*S3Backend, error) {
 func (b *S3Backend) init() {
 	b.once.Do(func() {
 		if b.s3Client == nil {
-			awsCfg, err := getDefaultAWSConfig()
+			awsCfg, err := getDefaultAWSConfig(context.Background())
 			if err != nil {
 				b.initErr = err
 			}
@@ -728,7 +728,7 @@ func checkFunctionResponseTypes(ctx context.Context, c *runOptions) {
 		}
 	}()
 
-	awsCfg, err := getDefaultAWSConfig()
+	awsCfg, err := getDefaultAWSConfig(context.Background())
 	if err != nil {
 		return
 	}

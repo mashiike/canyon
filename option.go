@@ -111,7 +111,7 @@ func (c *runOptions) SQSClientAndQueueURL() (string, SQSClient) {
 	defer c.mu.Unlock()
 	if c.sqsClient == nil {
 		c.DebugWhenVarbose("sqs client is not initialized, try to load default config")
-		awsCfg, err := getDefaultAWSConfig()
+		awsCfg, err := getDefaultAWSConfig(context.Background())
 		if err != nil {
 			c.DebugWhenVarbose("failed to load aws default config, set context cancel", "error", err)
 			c.cancel(fmt.Errorf("load aws default config: %w", err))

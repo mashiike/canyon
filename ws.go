@@ -220,7 +220,9 @@ func (h *WebsocketHTTPBridgeHandler) serveConnections(w http.ResponseWriter, req
 			return
 		}
 		w.WriteHeader(http.StatusOK)
-		io.Copy(w, &buf)
+		if _, err := io.Copy(w, &buf); err != nil {
+			logger.Error("@connections failed to write response", "detail", err)
+		}
 		return
 	}
 	w.Header().Set("X-Amzn-ErrorType", "ResourceNotFoundException")
@@ -309,16 +311,6 @@ func (h *WebsocketHTTPBridgeHandler) markActiveAt(connectionID string) {
 	h.connectionLastActiveAt[connectionID] = time.Now()
 }
 
-func (h *WebsocketHTTPBridgeHandler) getConnections() map[string]*websocket.Conn {
-	h.mu.RLock()
-	defer h.mu.RUnlock()
-	connections := make(map[string]*websocket.Conn)
-	for k, v := range h.connections {
-		connections[k] = v
-	}
-	return connections
-}
-
 func (h *WebsocketHTTPBridgeHandler) currentConnections() int {
 	h.mu.RLock()
 	defer h.mu.RUnlock()
@@ -329,7 +321,7 @@ func (h *WebsocketHTTPBridgeHandler) onConnect(w http.ResponseWriter, originReq 
 	now := time.Now()
 	connectionID := randomBase64String(11)
 	h.debugVerbose("generate connection id", "connection_id", connectionID, "remote_addr", originReq.RemoteAddr)
-	requsetID := randomBase64String(11)
+	requsetID := randomBase64String(13)
 	proxyCtx := &events.APIGatewayWebsocketProxyRequestContext{
 		ConnectionID:      connectionID,
 		RequestID:         requsetID,
@@ -391,7 +383,7 @@ func (h *WebsocketHTTPBridgeHandler) onConnect(w http.ResponseWriter, originReq 
 
 func (h *WebsocketHTTPBridgeHandler) onDisonnect(connectionID string) {
 	h.removeFromConnectionList(connectionID, websocket.CloseNormalClosure, "Connection Closed Normally")
-	requsetID := randomBase64String(11)
+	requsetID := randomBase64String(13)
 	connectedAt, _, originReq := h.popConnectionInfo(connectionID)
 	if originReq == nil {
 		h.logger.Warn("connection info not found", "connection_id", connectionID)
@@ -439,7 +431,7 @@ func (h *WebsocketHTTPBridgeHandler) onDisonnect(connectionID string) {
 }
 
 func (h *WebsocketHTTPBridgeHandler) onReceiveMessage(connectionID string, ws *websocket.Conn, msg []byte) error {
-	requsetID := randomBase64String(11)
+	requsetID := randomBase64String(13)
 	connectedAt, _, originReq := h.getConnectionInfo(connectionID)
 	routeKey, err := h.routeKeySelector(msg)
 	if err != nil {

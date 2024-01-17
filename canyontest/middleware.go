@@ -65,6 +65,7 @@ func AsWebsocket(next http.Handler, reqCtx events.APIGatewayWebsocketProxyReques
 	})
 }
 
+// AsLambda returns lambda.Handler that embeds logger and sqs message sender in context.
 func AsLambdaFallback(next lambda.Handler, sender canyon.WorkerSender) lambda.Handler {
 	return canyon.LambdaHandlerFunc(
 		func(ctx context.Context, event []byte) ([]byte, error) {

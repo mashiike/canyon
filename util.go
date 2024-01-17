@@ -183,6 +183,7 @@ func SetSQSMessageHeader(r *http.Request, message *events.SQSMessage) *http.Requ
 	return r
 }
 
+// API Gateway Websocket Proxy headers
 const (
 	HeaderAPIGatewayWebsocketConnectionID = "Api-Gateway-Websocket-Connection-Id"
 	HeaderAPIGatewayWebsocketRouteKey     = "Api-Gateway-Websocket-Route-Key"
@@ -190,6 +191,7 @@ const (
 	HeaderAPIGatewayWebsocketStage        = "Api-Gateway-Websocket-Stage"
 )
 
+// SetAPIGatewayWebsocketProxyHeader sets API Gateway Websocket Proxy headers to Request
 func SetAPIGatewayWebsocketProxyHeader(r *http.Request, reqCtx *events.APIGatewayWebsocketProxyRequestContext) *http.Request {
 	r.Header.Set(HeaderAPIGatewayWebsocketConnectionID, reqCtx.ConnectionID)
 	r.Header.Set(HeaderAPIGatewayWebsocketRouteKey, reqCtx.RouteKey)
@@ -198,10 +200,12 @@ func SetAPIGatewayWebsocketProxyHeader(r *http.Request, reqCtx *events.APIGatewa
 	return r
 }
 
+// WebsocketRouteKey returns route key from API Gateway Websocket Proxy headers.
 func WebsocketRouteKey(r *http.Request) string {
 	return r.Header.Get(HeaderAPIGatewayWebsocketRouteKey)
 }
 
+// WebsocketConnectionID returns connection id from API Gateway Websocket Proxy headers.
 func WebsocketConnectionID(r *http.Request) string {
 	return r.Header.Get(HeaderAPIGatewayWebsocketConnectionID)
 }

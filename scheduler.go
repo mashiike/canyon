@@ -77,7 +77,7 @@ func (s *EventBridgeScheduler) get(ctx context.Context) (string, EventBridgeSche
 	if s.iamRoleARN != "" && s.client != nil {
 		return s.iamRoleARN, s.client, nil
 	}
-	awsCfg, err := getDefaultAWSConfig()
+	awsCfg, err := getDefaultAWSConfig(context.Background())
 	if err != nil {
 		return "", nil, fmt.Errorf("failed to load aws config: %w", err)
 	}

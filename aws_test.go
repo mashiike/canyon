@@ -223,17 +223,17 @@ func TestSQSLongPollingService__WithAWS(t *testing.T) {
 		t.Log("Logs\n", logs.String())
 	})
 	logger := slog.New(slog.NewJSONHandler(&logs, &slog.HandlerOptions{Level: slog.LevelDebug}))
-	awsCfg, err := getDefaultAWSConfig()
+	awsCfg, err := getDefaultAWSConfig(context.Background())
 	require.NoError(t, err, "should load aws default config")
 	client := sqs.NewFromConfig(awsCfg)
-	getQueueUrl, err := client.GetQueueUrl(context.Background(), &sqs.GetQueueUrlInput{
+	getQueueURL, err := client.GetQueueUrl(context.Background(), &sqs.GetQueueUrlInput{
 		QueueName: aws.String(queueName),
 	})
 	require.NoError(t, err, "should get queue url")
 	svc := &sqsLongPollingService{
 		sqsClient:           client,
 		logger:              logger,
-		queueURL:            *getQueueUrl.QueueUrl,
+		queueURL:            *getQueueURL.QueueUrl,
 		maxDeleteRetry:      3,
 		waitTimeSeconds:     1,
 		maxNumberObMessages: 1,
