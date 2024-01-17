@@ -33,6 +33,7 @@ import (
 	"github.com/google/uuid"
 )
 
+// SQSClient is a client for SQS.
 type SQSClient interface {
 	SendMessage(ctx context.Context, params *sqs.SendMessageInput, optFns ...func(*sqs.Options)) (*sqs.SendMessageOutput, error)
 	ReceiveMessage(ctx context.Context, params *sqs.ReceiveMessageInput, optFns ...func(*sqs.Options)) (*sqs.ReceiveMessageOutput, error)
@@ -42,18 +43,21 @@ type SQSClient interface {
 	ChangeMessageVisibilityBatch(ctx context.Context, params *sqs.ChangeMessageVisibilityBatchInput, optFns ...func(*sqs.Options)) (*sqs.ChangeMessageVisibilityBatchOutput, error)
 }
 
+// S3Client is a client for S3.
 type S3Client interface {
 	manager.UploadAPIClient
 	manager.DownloadAPIClient
 	s3.HeadObjectAPIClient
 }
 
+// ManagmentAPIBackend is a backend for sending message to websocket connection using Amazon API Gateway Management API.
 type ManagementAPIClient interface {
 	PostToConnection(context.Context, *apigatewaymanagementapi.PostToConnectionInput, ...func(*apigatewaymanagementapi.Options)) (*apigatewaymanagementapi.PostToConnectionOutput, error)
 	DeleteConnection(context.Context, *apigatewaymanagementapi.DeleteConnectionInput, ...func(*apigatewaymanagementapi.Options)) (*apigatewaymanagementapi.DeleteConnectionOutput, error)
 	GetConnection(context.Context, *apigatewaymanagementapi.GetConnectionInput, ...func(*apigatewaymanagementapi.Options)) (*apigatewaymanagementapi.GetConnectionOutput, error)
 }
 
+// NewManagementAPIClient creates a new ManagementAPIClient.
 func NewManagementAPIClient(awsCfg aws.Config, endpointURL string) (ManagementAPIClient, error) {
 	if endpointURL == "" {
 		return nil, errors.New("endpoint url is required")
@@ -63,6 +67,7 @@ func NewManagementAPIClient(awsCfg aws.Config, endpointURL string) (ManagementAP
 	}), nil
 }
 
+// NewManagementAPIClientWithRequest creates a new ManagementAPIClient with request.
 func NewManagementAPIClientWithRequest(req *http.Request, endpointURL string) (ManagementAPIClient, error) {
 	awsCfg, err := getDefaultAWSConfig(context.Background())
 	if err != nil {

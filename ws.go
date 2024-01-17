@@ -40,6 +40,7 @@ func writeCloseFrame(ws *websocket.Conn, code int, reason string) error {
 	)
 }
 
+// WebsocketHTTPBridgeHandler is a http.Handler for websocket http bridge.
 type WebsocketHTTPBridgeHandler struct {
 	Handler                http.Handler
 	routeKeySelector       RouteKeySelector
@@ -54,6 +55,7 @@ type WebsocketHTTPBridgeHandler struct {
 	websocket.Upgrader
 }
 
+// NewWebsocketHTTPBridgeHandler returns new WebsocketHTTPBridgeHandler
 func NewWebsocketHTTPBridgeHandler(handler http.Handler) *WebsocketHTTPBridgeHandler {
 	h := &WebsocketHTTPBridgeHandler{
 		Handler:                handler,

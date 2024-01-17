@@ -22,9 +22,9 @@ func TestAsServer(t *testing.T) {
 			require.Equal(t, "/", r.URL.Path)
 			require.False(t, canyon.IsWorker(r), "should not be worker")
 			require.False(t, canyon.IsWebsocket(r), "should not be websocket")
-			msgID, err := canyon.SendToWorker(r, nil)
+			msgId, err := canyon.SendToWorker(r, nil)
 			require.NoError(t, err, "should send to sqs from server")
-			require.Equal(t, "message-id", msgID, "should return message id")
+			require.Equal(t, "message-id", msgId, "should return message id")
 			w.WriteHeader(http.StatusOK)
 		}),
 		canyon.WorkerSenderFunc(func(r *http.Request, _ *canyon.SendOptions) (string, error) {
@@ -67,9 +67,9 @@ func TestAsWebsocket(t *testing.T) {
 			require.True(t, canyon.IsWebsocket(r), "should be websocket")
 			require.Equal(t, "hello", canyon.WebsocketRouteKey(r), "should embed route key")
 			require.Equal(t, "ZZZZZZZZZZZZZZZ=", canyon.WebsocketConnectionID(r), "should embed connection id")
-			msgID, err := canyon.SendToWorker(r, nil)
+			msgId, err := canyon.SendToWorker(r, nil)
 			require.NoError(t, err, "should send to sqs from server")
-			require.Equal(t, "message-id", msgID, "should return message id")
+			require.Equal(t, "message-id", msgId, "should return message id")
 			w.WriteHeader(http.StatusOK)
 		}),
 		events.APIGatewayWebsocketProxyRequestContext{
