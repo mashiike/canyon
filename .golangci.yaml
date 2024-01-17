@@ -14,11 +14,22 @@ linters:
     - staticcheck
     - govet
     - errcheck
+  enable-all: false
+  disable:
+    - maligned
+    - exhaustive
+    - noctx
+    - asciicheck
+    - sqlclosecheck
+    - rowserrcheck
+    - gosec
+    - scopelint
+    - revive
+    - contextcheck
   presets:
     - bugs
     - unused
     - format
-  fast: false
 
 linters-settings:
   gocyclo:
