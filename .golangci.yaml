@@ -12,7 +12,6 @@ linters:
     - gocyclo
     - staticcheck
     - govet
-    - revive
   disable:
     - maligned
     - exhaustive
@@ -22,6 +21,7 @@ linters:
     - rowserrcheck
     - gosec
     - scopelint
+    - revive
     - contextcheck
   presets:
     - bugs
