@@ -1,5 +1,7 @@
 # Changelog
 
+## [v0.7.2](https://github.com/mashiike/canyon/compare/v0.7.1...v0.7.2) - 2024-02-22
+
 ## [v0.7.0](https://github.com/mashiike/canyon/compare/v0.6.0...v0.7.0) - 2024-01-17
 - add util function for check runs on canyon by @mashiike in https://github.com/mashiike/canyon/pull/40
 - Bump actions/setup-go from 4 to 5 by @dependabot in https://github.com/mashiike/canyon/pull/71
