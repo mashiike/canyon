@@ -27,12 +27,23 @@ func (p *eventPayload) UnmarshalJSON(bs []byte) error {
 	var sqsEvent events.SQSEvent
 	sqsUnmarshalErr := json.Unmarshal(bs, &sqsEvent)
 	if sqsUnmarshalErr == nil {
-		if len(sqsEvent.Records) > 0 {
-			p.IsSQSEvent = true
-			p.SQSEvent = &sqsEvent
-			return nil
+		if len(sqsEvent.Records) == 0 {
+			sqsUnmarshalErr = errors.New("no Records")
+		} else {
+			allCanyonEvent := true
+			for _, record := range sqsEvent.Records {
+				if record.EventSource != "aws:sqs" {
+					allCanyonEvent = false
+					break
+				}
+			}
+			if allCanyonEvent {
+				p.IsSQSEvent = true
+				p.SQSEvent = &sqsEvent
+				return nil
+			}
+			sqsUnmarshalErr = errors.New("not all records are from aws:sqs")
 		}
-		sqsUnmarshalErr = errors.New("no Records")
 	}
 	req, newRequestErr := ridge.NewRequest(bs)
 	if newRequestErr == nil {

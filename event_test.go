@@ -73,3 +73,10 @@ func TestEventPayload__AnyEvent(t *testing.T) {
 	require.Error(t, err, "should failed unmarshal")
 	require.EqualError(t, err, "can not unmarshal as sqs event: no Records\ncan not unmarshal as http event: no Host and Method\ncan not unmarshal as websocket proxy event: no APIID and ConnectionID")
 }
+
+func TestEventPayload__S3Event(t *testing.T) {
+	var p eventPayload
+	err := p.UnmarshalJSON(ReadFile(t, "testdata/s3_event.json"))
+	require.Error(t, err, "should failed unmarshal")
+	require.EqualError(t, err, "can not unmarshal as sqs event: not all records are from aws:sqs\ncan not unmarshal as http event: no Host and Method\ncan not unmarshal as websocket proxy event: no APIID and ConnectionID")
+}
