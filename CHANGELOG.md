@@ -1,5 +1,11 @@
 # Changelog
 
+## [v0.7.1](https://github.com/mashiike/canyon/compare/v0.7.0...v0.7.1) - 2024-02-22
+- Bump github.com/aws/aws-sdk-go-v2/credentials from 1.16.15 to 1.16.16 by @dependabot in https://github.com/mashiike/canyon/pull/88
+- Bump github.com/aws/aws-sdk-go-v2/config from 1.26.4 to 1.27.0 by @dependabot in https://github.com/mashiike/canyon/pull/94
+- Bump github.com/google/uuid from 1.5.0 to 1.6.0 by @dependabot in https://github.com/mashiike/canyon/pull/91
+- Bump github.com/aws/aws-sdk-go-v2/service/s3 from 1.48.0 to 1.48.1 by @dependabot in https://github.com/mashiike/canyon/pull/92
+
 ## [v0.7.0](https://github.com/mashiike/canyon/compare/v0.6.0...v0.7.0) - 2024-01-17
 - add util function for check runs on canyon by @mashiike in https://github.com/mashiike/canyon/pull/40
 - Bump actions/setup-go from 4 to 5 by @dependabot in https://github.com/mashiike/canyon/pull/71
