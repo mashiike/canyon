@@ -2,7 +2,7 @@ package canyon
 
 import (
 	"bytes"
-	"crypto/md5"
+	"crypto/md5" //nolint: gosec
 	cryptorand "crypto/rand"
 	"encoding/base64"
 	"fmt"
