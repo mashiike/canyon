@@ -81,6 +81,7 @@ func TestDefaultSerializerDesirialize__NonBackend(t *testing.T) {
 		"Sqs-Message-Attribute-String-Attribute1":           {"AttributeValue1"},
 		"Sqs-Message-Attribute-Number-Attribute2":           {"123", "1", "0"},
 		"Sqs-Message-Attribute-Binary-Attribute3":           {"YWJj", "MTIz", "MTEwMA==", "MA==", "MQ==", "MA=="},
+		"Sqs-Message-Attribute-String-Sender":               {"canyon"},
 	}
 	require.EqualValues(t, expectedHeader, req.Header, "should have header")
 	err = req.ParseForm()

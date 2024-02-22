@@ -36,6 +36,23 @@ func (p *eventPayload) UnmarshalJSON(bs []byte) error {
 					allCanyonEvent = false
 					break
 				}
+				if record.MessageAttributes == nil {
+					allCanyonEvent = false
+					break
+				}
+				sender, ok := record.MessageAttributes["Sender"]
+				if !ok {
+					allCanyonEvent = false
+					break
+				}
+				if sender.DataType != "String" {
+					allCanyonEvent = false
+					break
+				}
+				if *sender.StringValue != "canyon" {
+					allCanyonEvent = false
+					break
+				}
 			}
 			if allCanyonEvent {
 				p.IsSQSEvent = true

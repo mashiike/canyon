@@ -29,6 +29,12 @@
           "stringListValues" : [ ],
           "binaryListValues" : [ ],
           "dataType" : "String"
+        },
+        "Sender": {
+          "stringValue": "canyon",
+          "stringListValues": [],
+          "binaryListValues": [],
+          "dataType": "String"
         }
       },
       "md5OfBody": "f5fe70cf5deffcae2d8405f991b65402",
