@@ -3,6 +3,8 @@ package canyon
 import (
 	"errors"
 	"net/http"
+
+	"github.com/aws/aws-sdk-go-v2/aws"
 )
 
 // MessageAttributeValue is a struct for sqs message attribute.
@@ -44,6 +46,16 @@ func SendToWorker(r *http.Request, opts *SendOptions) (string, error) {
 	workerSender := workerSenderFromContext(r.Context())
 	if workerSender == nil {
 		return "", errors.New("sqs message sender is not set: may be worker or not running with canyon")
+	}
+	if opts == nil {
+		opts = &SendOptions{}
+	}
+	if opts.MessageAttributes == nil {
+		opts.MessageAttributes = map[string]MessageAttributeValue{}
+	}
+	opts.MessageAttributes["Sender"] = MessageAttributeValue{
+		DataType:    "String",
+		StringValue: aws.String("canyon"),
 	}
 	return workerSender.SendToWorker(r, opts)
 }
