@@ -11,7 +11,7 @@ require (
 	github.com/aws/aws-sdk-go-v2/feature/s3/manager v1.15.12
 	github.com/aws/aws-sdk-go-v2/service/apigatewaymanagementapi v1.17.6
 	github.com/aws/aws-sdk-go-v2/service/lambda v1.49.7
-	github.com/aws/aws-sdk-go-v2/service/s3 v1.48.0
+	github.com/aws/aws-sdk-go-v2/service/s3 v1.48.1
 	github.com/aws/aws-sdk-go-v2/service/scheduler v1.6.6
 	github.com/aws/aws-sdk-go-v2/service/sqs v1.29.7
 	github.com/aws/aws-sdk-go-v2/service/sts v1.27.0
