@@ -492,7 +492,7 @@ func (c *inMemorySQSClient) ReceiveMessage(ctx context.Context, params *sqs.Rece
 				}
 				msg := c.messages[key]
 				if is, ok := c.isProcessing[key]; ok && is {
-					if time.Since(c.processingStartTime[key]) < c.messageVisibilityTimeout[key] {
+					if flextime.Since(c.processingStartTime[key]) < c.messageVisibilityTimeout[key] {
 						continue
 					}
 					delete(c.isProcessing, key)
@@ -501,11 +501,11 @@ func (c *inMemorySQSClient) ReceiveMessage(ctx context.Context, params *sqs.Rece
 					delete(c.messageIDByReceiptHandle, *msg.ReceiptHandle)
 					continue
 				}
-				if receivableTime, ok := c.receivableTime[key]; ok && receivableTime.After(time.Now()) {
+				if receivableTime, ok := c.receivableTime[key]; ok && receivableTime.After(flextime.Now()) {
 					continue
 				}
 				c.isProcessing[key] = true
-				c.processingStartTime[key] = time.Now()
+				c.processingStartTime[key] = flextime.Now()
 				if params.VisibilityTimeout > 0 {
 					c.messageVisibilityTimeout[key] = time.Duration(params.VisibilityTimeout) * time.Second
 				} else {

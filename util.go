@@ -13,6 +13,7 @@ import (
 	"net/url"
 	"os"
 	"strings"
+	"sync"
 	"time"
 	"unicode"
 
@@ -215,9 +216,14 @@ func IsWebsocket(r *http.Request) bool {
 	return WebsocketRouteKey(r) != "" && WebsocketConnectionID(r) != ""
 }
 
-var randomReader = rand.New(rand.NewSource(time.Now().UnixNano()))
+var (
+	randomReaderMu sync.Mutex
+	randomReader   = rand.New(rand.NewSource(time.Now().UnixNano()))
+)
 
 func randomBytes(n int) []byte {
+	randomReaderMu.Lock()
+	defer randomReaderMu.Unlock()
 	bs := make([]byte, n)
 	_, err := io.ReadFull(randomReader, bs)
 	if err != nil {
