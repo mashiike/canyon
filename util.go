@@ -2,10 +2,13 @@ package canyon
 
 import (
 	"bytes"
-	"crypto/md5"
+	"crypto/md5" //nolint: gosec
+	cryptorand "crypto/rand"
 	"encoding/base64"
 	"fmt"
 	"io"
+	"math"
+	"math/big"
 	"math/rand"
 	"mime"
 	"net/http"
@@ -13,7 +16,7 @@ import (
 	"net/url"
 	"os"
 	"strings"
-	"time"
+	"sync"
 	"unicode"
 
 	"github.com/aws/aws-lambda-go/events"
@@ -215,11 +218,26 @@ func IsWebsocket(r *http.Request) bool {
 	return WebsocketRouteKey(r) != "" && WebsocketConnectionID(r) != ""
 }
 
-var randomReader = rand.New(rand.NewSource(time.Now().UnixNano()))
+var (
+	randomReaderMu   sync.Mutex
+	rondomReaderOnce = sync.OnceValues(func() (*rand.Rand, error) {
+		seed, err := cryptorand.Int(cryptorand.Reader, big.NewInt(math.MaxInt64))
+		if err != nil {
+			return nil, fmt.Errorf("failed to generate seed: %w", err)
+		}
+		return rand.New(rand.NewSource(seed.Int64())), nil //nolint: gosec
+	})
+)
 
 func randomBytes(n int) []byte {
+	randomReaderMu.Lock()
+	defer randomReaderMu.Unlock()
+	r, err := rondomReaderOnce()
+	if err != nil {
+		panic(err)
+	}
 	bs := make([]byte, n)
-	_, err := io.ReadFull(randomReader, bs)
+	_, err = io.ReadFull(r, bs)
 	if err != nil {
 		panic(err)
 	}

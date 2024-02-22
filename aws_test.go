@@ -132,8 +132,10 @@ func TestInMemorySQSClient__DelaySeconds(t *testing.T) {
 		return *sendMessageResult.MessageId
 	}
 
-	nonDelayMessageID := setSendMessage(0)
 	delayMessageID := setSendMessage(900)
+	nonDelayMessageID := setSendMessage(0)
+	t.Log("delayMessageID", delayMessageID)
+	t.Log("nonDelayMessageID", nonDelayMessageID)
 	require.Equal(t, 2, inMemorySQSClient.MessageCount(), "should have 1 message in fake sqs client")
 
 	reciveMessage := func() string {
