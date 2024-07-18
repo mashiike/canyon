@@ -1,5 +1,4 @@
 {
-  "backend_url": "file:///tmp/canyon_test",
   "method": "POST",
   "header": {
     "Accept": [
@@ -14,9 +13,6 @@
     "User-Agent": [
       "curl/7.68.0"
     ],
-    "X-Amzn-Requestid": [
-      "Jl6UpgU9tjMEPLA="
-    ],
     "X-Amzn-Trace-Id": [
       "Root=1-5e723db7-6077c85e0d781094f0c83e24"
     ],
@@ -30,6 +26,7 @@
       "https"
     ]
   },
+  "body": "Zm9vPWJhciUyMGJheg==",
   "content_length": 13,
   "remote_addr": "203.0.113.1",
   "host": "abcdefg.execute-api.ap-northeast-1.amazonaws.com",

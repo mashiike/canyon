@@ -1,10 +1,14 @@
 package canyon
 
 import (
+	"bytes"
 	"context"
+	"encoding/json"
+	"flag"
 	"io"
 	"net/http"
 	"net/url"
+	"os"
 	"strings"
 	"testing"
 
@@ -26,6 +30,8 @@ func (b *mockBackend) LoadRequestBody(_ context.Context, _ *url.URL) (io.ReadClo
 	return io.NopCloser(strings.NewReader("hello=world")), nil
 }
 
+var updateFlag = flag.Bool("update", false, "update golden files")
+
 func TestDefaultSerializerSerialize__NonBackend(t *testing.T) {
 	req, err := ridge.NewRequest(ReadFile(t, "testdata/http_event.json"))
 	require.NoError(t, err, "should create request")
@@ -33,8 +39,15 @@ func TestDefaultSerializerSerialize__NonBackend(t *testing.T) {
 	serializer := NewDefaultSerializer()
 	serialized, err := serializer.Serialize(context.Background(), req)
 	require.NoError(t, err, "should serialize request")
-
-	require.JSONEq(t, string(ReadFile(t, "testdata/serialized_http_request.json")), string(*serialized.MessageBody), "same as expected serialized request")
+	fixturePath := "testdata/serialized_http_request.json"
+	if *updateFlag {
+		var dest bytes.Buffer
+		err := json.Indent(&dest, []byte(*serialized.MessageBody), "", "  ")
+		require.NoError(t, err, "should indent json")
+		err = os.WriteFile(fixturePath, dest.Bytes(), 0644)
+		require.NoError(t, err, "should write file")
+	}
+	require.JSONEq(t, string(ReadFile(t, fixturePath)), string(*serialized.MessageBody), "same as expected serialized request")
 }
 
 func TestDefaultSerializerSerialize__MockBackend(t *testing.T) {
@@ -45,7 +58,15 @@ func TestDefaultSerializerSerialize__MockBackend(t *testing.T) {
 	serialized, err := serializer.Serialize(context.Background(), req)
 	require.NoError(t, err, "should serialize request")
 
-	require.JSONEq(t, string(ReadFile(t, "testdata/serialized_http_request_with_mock_backend.json")), string(*serialized.MessageBody), "same as expected serialized request")
+	fixturePath := "testdata/serialized_http_request_with_mock_backend.json"
+	if *updateFlag {
+		var dest bytes.Buffer
+		err := json.Indent(&dest, []byte(*serialized.MessageBody), "", "  ")
+		require.NoError(t, err, "should indent json")
+		err = os.WriteFile(fixturePath, dest.Bytes(), 0644)
+		require.NoError(t, err, "should write file")
+	}
+	require.JSONEq(t, string(ReadFile(t, fixturePath)), string(*serialized.MessageBody), "same as expected serialized request")
 }
 
 func TestDefaultSerializerDesirialize__NonBackend(t *testing.T) {

@@ -13,6 +13,9 @@
     "User-Agent": [
       "curl/7.68.0"
     ],
+    "X-Amzn-Requestid": [
+      "Jl6UpgU9tjMEPLA="
+    ],
     "X-Amzn-Trace-Id": [
       "Root=1-5e723db7-6077c85e0d781094f0c83e24"
     ],
