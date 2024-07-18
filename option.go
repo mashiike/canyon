@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -328,7 +329,25 @@ func WithCanyonEnv(envPrefix string) Option {
 		switch strings.ToLower(env) {
 		case "development":
 			WithVarbose()(c)
-			WithInMemoryQueue(30*time.Second, 3, nil)(c)
+			visibilityTimeout := 30 * time.Second
+			maxReceiveCount := int32(3)
+			if str := os.Getenv(envPrefix + "INMEMORY_VISIBILITY_TIMEOUT"); str != "" {
+				d, err := time.ParseDuration(str)
+				if err != nil {
+					c.cancel(fmt.Errorf("parse visibility timeout: %w", err))
+					return
+				}
+				visibilityTimeout = d
+			}
+			if str := os.Getenv(envPrefix + "INMEMORY_MAX_RECEIVE_COUNT"); str != "" {
+				i, err := strconv.ParseUint(str, 10, 32)
+				if err != nil {
+					c.cancel(fmt.Errorf("parse max receive count: %w", err))
+					return
+				}
+				maxReceiveCount = int32(i)
+			}
+			WithInMemoryQueue(visibilityTimeout, maxReceiveCount, nil)(c)
 			var backendPath string
 			if urlStr := os.Getenv(envPrefix + "BACKEND_URL"); urlStr != "" {
 				if u, err := parseURL(urlStr); err == nil && u.Scheme == "file" {
@@ -365,7 +384,25 @@ func WithCanyonEnv(envPrefix string) Option {
 				}))(c)
 			}
 		case "test":
-			WithInMemoryQueue(30*time.Second, 3, nil)(c)
+			visibilityTimeout := 30 * time.Second
+			maxReceiveCount := int32(3)
+			if str := os.Getenv(envPrefix + "INMEMORY_VISIBILITY_TIMEOUT"); str != "" {
+				d, err := time.ParseDuration(str)
+				if err != nil {
+					c.cancel(fmt.Errorf("parse visibility timeout: %w", err))
+					return
+				}
+				visibilityTimeout = d
+			}
+			if str := os.Getenv(envPrefix + "INMEMORY_MAX_RECEIVE_COUNT"); str != "" {
+				i, err := strconv.ParseUint(str, 10, 32)
+				if err != nil {
+					c.cancel(fmt.Errorf("parse max receive count: %w", err))
+					return
+				}
+				maxReceiveCount = int32(i)
+			}
+			WithInMemoryQueue(visibilityTimeout, maxReceiveCount, nil)(c)
 			WithBackend(NewInMemoryBackend())(c)
 			if useScheduler {
 				WithScheduler(NewInMemoryScheduler(func() SQSClient {
