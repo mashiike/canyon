@@ -1,5 +1,8 @@
 # Changelog
 
+## [v0.8.0](https://github.com/mashiike/canyon/compare/v0.7.1...v0.8.0) - 2024-07-18
+- when development, change inmemory visibility timeout by @mashiike in https://github.com/mashiike/canyon/pull/135
+
 ## [v0.7.1](https://github.com/mashiike/canyon/compare/v0.7.0...v0.7.1) - 2024-02-22
 - Bump github.com/aws/aws-sdk-go-v2/credentials from 1.16.15 to 1.16.16 by @dependabot in https://github.com/mashiike/canyon/pull/88
 - Bump github.com/aws/aws-sdk-go-v2/config from 1.26.4 to 1.27.0 by @dependabot in https://github.com/mashiike/canyon/pull/94
