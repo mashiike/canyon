@@ -1,5 +1,9 @@
 # Changelog
 
+## [v0.8.1](https://github.com/mashiike/canyon/compare/v0.8.0...v0.8.1) - 2024-11-20
+- Bump support go version and go moduels by @mashiike in https://github.com/mashiike/canyon/pull/160
+- Bump github.com/stretchr/testify from 1.8.4 to 1.9.0 by @dependabot in https://github.com/mashiike/canyon/pull/162
+
 ## [v0.8.0](https://github.com/mashiike/canyon/compare/v0.7.1...v0.8.0) - 2024-07-18
 - when development, change inmemory visibility timeout by @mashiike in https://github.com/mashiike/canyon/pull/135
 
