@@ -73,6 +73,9 @@ func runWithContext(ctx context.Context, mux http.Handler, c *runOptions) error 
 	serverHandler := newServerHandler(mux, c)
 	lambdaFallbackHandler := newLambdaFallbackHandler(mux, c)
 	if isLambda() {
+		lambdaOptions := make([]lambda.Option, len(c.lambdaOptions), len(c.lambdaOptions)+1)
+		copy(lambdaOptions, c.lambdaOptions)
+		lambdaOptions = append(lambdaOptions, lambda.WithContext(ctx))
 		lambda.StartWithOptions(
 			func(ctx context.Context, event json.RawMessage) (interface{}, error) {
 				var p eventPayload
@@ -122,7 +125,7 @@ func runWithContext(ctx context.Context, mux http.Handler, c *runOptions) error 
 				}
 				return nil, errors.New("unsupported event")
 			},
-			lambda.WithContext(ctx),
+			lambdaOptions...,
 		)
 		return nil
 	}
