@@ -1,5 +1,9 @@
 # Changelog
 
+## [v0.9.0](https://github.com/mashiike/canyon/compare/v0.8.1...v0.9.0) - 2025-02-07
+- implement WithSignalTERM by @mashiike in https://github.com/mashiike/canyon/pull/176
+- Bump github.com/stretchr/testify from 1.9.0 to 1.10.0 by @dependabot in https://github.com/mashiike/canyon/pull/164
+
 ## [v0.8.1](https://github.com/mashiike/canyon/compare/v0.8.0...v0.8.1) - 2024-11-20
 - Bump support go version and go moduels by @mashiike in https://github.com/mashiike/canyon/pull/160
 - Bump github.com/stretchr/testify from 1.8.4 to 1.9.0 by @dependabot in https://github.com/mashiike/canyon/pull/162
