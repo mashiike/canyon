@@ -71,6 +71,7 @@ type runOptions struct {
 	serializer                         Serializer
 	scheduler                          Scheduler
 	workerTimeoutMergin                time.Duration
+	lambdaOptions                      []lambda.Option
 }
 
 func defaultRunConfig(cancel context.CancelCauseFunc, sqsQueueName string) *runOptions {
@@ -528,5 +529,13 @@ func WithWebsocketAddress(address string) Option {
 func WithDisableWebsocket() Option {
 	return func(c *runOptions) {
 		c.disableWebsocket = true
+	}
+}
+
+// WithLambdaOptions returns a new Option that sets the lambda options.
+// if set this option, canyon lambda handler use this options.
+func WithLambdaOptions(options ...lambda.Option) Option {
+	return func(c *runOptions) {
+		c.lambdaOptions = append(c.lambdaOptions, options...)
 	}
 }
