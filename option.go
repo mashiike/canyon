@@ -539,3 +539,9 @@ func WithLambdaOptions(options ...lambda.Option) Option {
 		c.lambdaOptions = append(c.lambdaOptions, options...)
 	}
 }
+
+// WithEnableSIGTERM returns a new Option that enable SIGTERM signal handler.
+// this options is ailias of WithLambdaOptions(lambda.WithEnableSIGTERM(callbacks...)).
+func WithEnableSIGTERM(callbacks ...func()) Option {
+	return WithLambdaOptions(lambda.WithEnableSIGTERM(callbacks...))
+}
