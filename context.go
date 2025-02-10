@@ -138,6 +138,12 @@ func IsWorker(r *http.Request) bool {
 	return isWorker
 }
 
+// IsWorkerFromContext returns true if the request is from worker.
+func IsWorkerFromContext(ctx context.Context) bool {
+	isWorker, ok := ctx.Value(contextKeyIsWorker).(bool)
+	return ok && isWorker
+}
+
 // Used return true if the request handled by canyon.
 func Used(r *http.Request) bool {
 	ctx := r.Context()
@@ -148,6 +154,14 @@ func Used(r *http.Request) bool {
 		return true
 	}
 	return IsWorker(r)
+}
+
+// UsedFromContext returns true if the request handled by canyon.
+func UsedFromContext(ctx context.Context) bool {
+	if _, ok := ctx.Value(contextKeyWorkerSender).(WorkerSender); ok {
+		return true
+	}
+	return IsWorkerFromContext(ctx)
 }
 
 // EmbedIsWorkerInContext embeds isWorker flag in context.
