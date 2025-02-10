@@ -76,57 +76,59 @@ func runWithContext(ctx context.Context, mux http.Handler, c *runOptions) error 
 		lambdaOptions := make([]lambda.Option, len(c.lambdaOptions), len(c.lambdaOptions)+1)
 		copy(lambdaOptions, c.lambdaOptions)
 		lambdaOptions = append(lambdaOptions, lambda.WithContext(ctx))
-		lambda.StartWithOptions(
-			func(ctx context.Context, event json.RawMessage) (interface{}, error) {
-				var p eventPayload
-				if err := json.Unmarshal(event, &p); err != nil {
-					if lambdaFallbackHandler != nil {
-						return lambdaFallbackHandler.Invoke(ctx, event)
-					}
-					return nil, err
-				}
-				if p.IsSQSEvent {
-					if len(p.SQSEvent.Records) > 1 {
-						onceCheckFunctionResponseTypes.Do(func() {
-							checkFunctionResponseTypes(ctx, c)
-						})
-					}
-
-					resp, err := workerHandler(ctx, p.SQSEvent)
-					if err != nil {
-						return nil, err
-					}
-					if len(resp.BatchItemFailures) == 0 {
-						return resp, nil
-					}
-					if len(p.SQSEvent.Records) == 1 {
-						return resp, fmt.Errorf("failed processing record(message_id=%s)", p.SQSEvent.Records[0].MessageId)
-					}
-					if !isEnableReportBatchItemFailures(ctx, p.SQSEvent.Records[0].EventSourceARN) {
-						return resp, fmt.Errorf("failed processing %d records", len(resp.BatchItemFailures))
-					}
-					return resp, nil
-				}
-				if p.IsHTTPEvent {
-					r := p.Request.WithContext(ctx)
-					w := ridge.NewResponseWriter()
-					serverHandler.ServeHTTP(w, r)
-					return w.Response(), nil
-				}
-				if p.IsWebsocketProxyEvent {
-					r := p.Request.WithContext(ctx)
-					w := ridge.NewResponseWriter()
-					serverHandler.ServeHTTP(w, r)
-					return w.Response(), nil
-				}
-
+		var lambdaHandler interface{}
+		lambdaHandler = func(ctx context.Context, event json.RawMessage) (interface{}, error) {
+			var p eventPayload
+			if err := json.Unmarshal(event, &p); err != nil {
 				if lambdaFallbackHandler != nil {
 					return lambdaFallbackHandler.Invoke(ctx, event)
 				}
-				return nil, errors.New("unsupported event")
-			},
-			lambdaOptions...,
-		)
+				return nil, err
+			}
+			if p.IsSQSEvent {
+				if len(p.SQSEvent.Records) > 1 {
+					onceCheckFunctionResponseTypes.Do(func() {
+						checkFunctionResponseTypes(ctx, c)
+					})
+				}
+
+				resp, err := workerHandler(ctx, p.SQSEvent)
+				if err != nil {
+					return nil, err
+				}
+				if len(resp.BatchItemFailures) == 0 {
+					return resp, nil
+				}
+				if len(p.SQSEvent.Records) == 1 {
+					return resp, fmt.Errorf("failed processing record(message_id=%s)", p.SQSEvent.Records[0].MessageId)
+				}
+				if !isEnableReportBatchItemFailures(ctx, p.SQSEvent.Records[0].EventSourceARN) {
+					return resp, fmt.Errorf("failed processing %d records", len(resp.BatchItemFailures))
+				}
+				return resp, nil
+			}
+			if p.IsHTTPEvent {
+				r := p.Request.WithContext(ctx)
+				w := ridge.NewResponseWriter()
+				serverHandler.ServeHTTP(w, r)
+				return w.Response(), nil
+			}
+			if p.IsWebsocketProxyEvent {
+				r := p.Request.WithContext(ctx)
+				w := ridge.NewResponseWriter()
+				serverHandler.ServeHTTP(w, r)
+				return w.Response(), nil
+			}
+
+			if lambdaFallbackHandler != nil {
+				return lambdaFallbackHandler.Invoke(ctx, event)
+			}
+			return nil, errors.New("unsupported event")
+		}
+		for _, middleware := range c.lambdaMiddlewares {
+			lambdaHandler = middleware(lambdaHandler)
+		}
+		lambda.StartWithOptions(lambdaHandler, lambdaOptions...)
 		return nil
 	}
 	if c.useInMemorySQS {

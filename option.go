@@ -72,6 +72,7 @@ type runOptions struct {
 	scheduler                          Scheduler
 	workerTimeoutMergin                time.Duration
 	lambdaOptions                      []lambda.Option
+	lambdaMiddlewares                  []func(interface{}) interface{}
 }
 
 func defaultRunConfig(cancel context.CancelCauseFunc, sqsQueueName string) *runOptions {
@@ -544,4 +545,12 @@ func WithLambdaOptions(options ...lambda.Option) Option {
 // this options is ailias of WithLambdaOptions(lambda.WithEnableSIGTERM(callbacks...)).
 func WithEnableSIGTERM(callbacks ...func()) Option {
 	return WithLambdaOptions(lambda.WithEnableSIGTERM(callbacks...))
+}
+
+// WithLambdaMiddlewares returns a new Option that sets the lambda middlewares.
+// if set this option, canyon lambda handler use this middlewares.
+func WithLambdaMiddlewares(middlewares ...func(interface{}) interface{}) Option {
+	return func(c *runOptions) {
+		c.lambdaMiddlewares = append(c.lambdaMiddlewares, middlewares...)
+	}
 }
