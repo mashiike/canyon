@@ -76,8 +76,7 @@ func runWithContext(ctx context.Context, mux http.Handler, c *runOptions) error 
 		lambdaOptions := make([]lambda.Option, len(c.lambdaOptions), len(c.lambdaOptions)+1)
 		copy(lambdaOptions, c.lambdaOptions)
 		lambdaOptions = append(lambdaOptions, lambda.WithContext(ctx))
-		var lambdaHandler interface{}
-		lambdaHandler = func(ctx context.Context, event json.RawMessage) (interface{}, error) {
+		lambdaHandler := lambda.NewHandlerWithOptions(func(ctx context.Context, event json.RawMessage) (interface{}, error) {
 			var p eventPayload
 			if err := json.Unmarshal(event, &p); err != nil {
 				if lambdaFallbackHandler != nil {
@@ -124,11 +123,11 @@ func runWithContext(ctx context.Context, mux http.Handler, c *runOptions) error 
 				return lambdaFallbackHandler.Invoke(ctx, event)
 			}
 			return nil, errors.New("unsupported event")
-		}
+		}, lambdaOptions...)
 		for _, middleware := range c.lambdaMiddlewares {
 			lambdaHandler = middleware(lambdaHandler)
 		}
-		lambda.StartWithOptions(lambdaHandler, lambdaOptions...)
+		lambda.Start(lambdaHandler)
 		return nil
 	}
 	if c.useInMemorySQS {
