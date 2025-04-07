@@ -1,6 +1,7 @@
 module github.com/mashiike/canyon
 
 go 1.21.0
+toolchain go1.24.1
 
 require (
 	github.com/Songmu/flextime v0.1.0
@@ -21,7 +22,7 @@ require (
 	github.com/gorilla/websocket v1.5.3
 	github.com/pires/go-proxyproto v0.8.0
 	github.com/stretchr/testify v1.10.0
-	golang.org/x/text v0.22.0
+	golang.org/x/text v0.24.0
 )
 
 require (
