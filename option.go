@@ -2,6 +2,7 @@ package canyon
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"io"
 	"log/slog"
@@ -73,6 +74,7 @@ type runOptions struct {
 	workerTimeoutMergin                time.Duration
 	lambdaOptions                      []lambda.Option
 	lambdaMiddlewares                  []func(lambda.Handler) lambda.Handler
+	invokeModeStramingResponse         bool
 }
 
 func defaultRunConfig(cancel context.CancelCauseFunc, sqsQueueName string) *runOptions {
@@ -113,14 +115,22 @@ func (c *runOptions) SQSClientAndQueueURL() (string, SQSClient) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	if c.sqsClient == nil {
-		c.DebugWhenVarbose("sqs client is not initialized, try to load default config")
-		awsCfg, err := getDefaultAWSConfig(context.Background())
-		if err != nil {
-			c.DebugWhenVarbose("failed to load aws default config, set context cancel", "error", err)
-			c.cancel(fmt.Errorf("load aws default config: %w", err))
-			return "", sqs.New(sqs.Options{})
+		if c.useInMemorySQS {
+			c.sqsClient = &inMemorySQSClient{
+				visibilityTimeout: c.inMemorySQSClientVisibilityTimeout,
+				maxReceiveCount:   int(c.inMemorySQSClientMaxReceiveCount),
+				dlq:               json.NewEncoder(c.inMemorySQSClientDLQ),
+			}
+		} else {
+			c.DebugWhenVarbose("sqs client is not initialized, try to load default config")
+			awsCfg, err := getDefaultAWSConfig(context.Background())
+			if err != nil {
+				c.DebugWhenVarbose("failed to load aws default config, set context cancel", "error", err)
+				c.cancel(fmt.Errorf("load aws default config: %w", err))
+				return "", sqs.New(sqs.Options{})
+			}
+			c.sqsClient = sqs.NewFromConfig(awsCfg)
 		}
-		c.sqsClient = sqs.NewFromConfig(awsCfg)
 	}
 	if c.sqsQueueURL == "" {
 		c.DebugWhenVarbose("sqs queue url is not initialized, try to get queue url")
@@ -145,7 +155,11 @@ func (c *runOptions) DebugWhenVarbose(msg string, keysAndValues ...interface{}) 
 
 func (c *runOptions) DebugContextWhenVarbose(ctx context.Context, msg string, keysAndValues ...interface{}) {
 	if c.logVarbose {
-		c.logger.DebugContext(ctx, msg, keysAndValues...)
+		logger, ok := loggerFromContext(ctx)
+		if !ok {
+			logger = c.logger
+		}
+		logger.DebugContext(ctx, msg, keysAndValues...)
 	}
 }
 
@@ -157,13 +171,21 @@ func (c *runOptions) InfoWhenVarbose(msg string, keysAndValues ...interface{}) {
 
 func (c *runOptions) InfoContextWhenVarbose(ctx context.Context, msg string, keysAndValues ...interface{}) {
 	if c.logVarbose {
-		c.logger.InfoContext(ctx, msg, keysAndValues...)
+		logger, ok := loggerFromContext(ctx)
+		if !ok {
+			logger = c.logger
+		}
+		logger.InfoContext(ctx, msg, keysAndValues...)
 	}
 }
 
 func (c *runOptions) WarnContextWhenVarbose(ctx context.Context, msg string, keysAndValues ...interface{}) {
 	if c.logVarbose {
-		c.logger.WarnContext(ctx, msg, keysAndValues...)
+		logger, ok := loggerFromContext(ctx)
+		if !ok {
+			logger = c.logger
+		}
+		logger.WarnContext(ctx, msg, keysAndValues...)
 	}
 }
 
@@ -552,5 +574,13 @@ func WithEnableSIGTERM(callbacks ...func()) Option {
 func WithLambdaMiddlewares(middlewares ...func(lambda.Handler) lambda.Handler) Option {
 	return func(c *runOptions) {
 		c.lambdaMiddlewares = append(c.lambdaMiddlewares, middlewares...)
+	}
+}
+
+// WithStreamingResponse returns a new Option that sets the lambda streaming response.
+// if set this option, canyon lambda handler use this options.
+func WithStreamingResponse() Option {
+	return func(c *runOptions) {
+		c.invokeModeStramingResponse = true
 	}
 }

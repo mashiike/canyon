@@ -177,14 +177,14 @@ func (svc *sqsLongPollingService) Start(ctx context.Context, fn sqsEventLambdaHa
 		default:
 		}
 		input := &sqs.ReceiveMessageInput{
-			QueueUrl:              aws.String(svc.queueURL),
-			MaxNumberOfMessages:   svc.maxNumberObMessages,
-			WaitTimeSeconds:       svc.waitTimeSeconds,
-			VisibilityTimeout:     int32(visibilityTimeout),
-			AttributeNames:        []types.QueueAttributeName{"All"},
-			MessageAttributeNames: []string{"All"},
+			QueueUrl:                    aws.String(svc.queueURL),
+			MaxNumberOfMessages:         svc.maxNumberObMessages,
+			WaitTimeSeconds:             svc.waitTimeSeconds,
+			VisibilityTimeout:           int32(visibilityTimeout),
+			MessageSystemAttributeNames: []types.MessageSystemAttributeName{"All"},
+			MessageAttributeNames:       []string{"All"},
 		}
-		svc.logger.DebugContext(ctx, "receive message from sqs queue", "queue_url", *input.QueueUrl, "max_number_of_messages", input.MaxNumberOfMessages, "wait_time_seconds", input.WaitTimeSeconds, "visibility_timeout", input.VisibilityTimeout, "attribute_names", input.AttributeNames, "message_attribute_names", input.MessageAttributeNames)
+		svc.logger.DebugContext(ctx, "receive message from sqs queue", "queue_url", *input.QueueUrl, "max_number_of_messages", input.MaxNumberOfMessages, "wait_time_seconds", input.WaitTimeSeconds, "visibility_timeout", input.VisibilityTimeout, "attribute_names", input.MessageSystemAttributeNames, "message_attribute_names", input.MessageAttributeNames)
 		output, err := svc.sqsClient.ReceiveMessage(ctx, input)
 		if err != nil {
 			return err
@@ -768,6 +768,6 @@ func checkFunctionResponseTypes(ctx context.Context, c *runOptions) {
 	}
 }
 
-func isEnableReportBatchItemFailures(ctx context.Context, eventSourceARN string) bool {
+func isEnableReportBatchItemFailures(_ context.Context, eventSourceARN string) bool {
 	return enableReportBatchItemFailures[eventSourceARN]
 }
