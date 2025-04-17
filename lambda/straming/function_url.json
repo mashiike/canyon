@@ -1,0 +1,6 @@
+{
+  "Config": {
+    "AuthType": "NONE",
+    "InvokeMode": "RESPONSE_STREAM"
+  }
+}

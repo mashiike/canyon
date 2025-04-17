@@ -139,18 +139,16 @@ func runWithContext(ctx context.Context, mux http.Handler, c *runOptions) error 
 	return context.Cause(ctx)
 }
 
-func setupLambdaHandler(ctx context.Context, workerHandler sqsEventLambdaHandlerFunc, serverHandler http.Handler, lambdaFallbackHandler lambda.Handler, c *runOptions) error {
+func setupLambdaHandler(_ context.Context, workerHandler sqsEventLambdaHandlerFunc, serverHandler http.Handler, lambdaFallbackHandler lambda.Handler, c *runOptions) error {
 	handler := &lambdaHandler{
-		ctx:                   ctx,
 		workerHandler:         workerHandler,
 		serverHandler:         serverHandler,
 		lambdaFallbackHandler: lambdaFallbackHandler,
 		runOptions:            c,
 	}
 
-	lambdaOptions := make([]lambda.Option, len(c.lambdaOptions), len(c.lambdaOptions)+1)
+	lambdaOptions := make([]lambda.Option, len(c.lambdaOptions))
 	copy(lambdaOptions, c.lambdaOptions)
-	lambdaOptions = append(lambdaOptions, lambda.WithContext(ctx))
 
 	lambdaHandler := lambda.NewHandlerWithOptions(handler.handleEvent, lambdaOptions...)
 	for _, middleware := range c.lambdaMiddlewares {
@@ -161,7 +159,6 @@ func setupLambdaHandler(ctx context.Context, workerHandler sqsEventLambdaHandler
 }
 
 type lambdaHandler struct {
-	ctx                   context.Context
 	workerHandler         sqsEventLambdaHandlerFunc
 	serverHandler         http.Handler
 	lambdaFallbackHandler lambda.Handler
@@ -173,7 +170,12 @@ func (h *lambdaHandler) handleEvent(ctx context.Context, event json.RawMessage) 
 	if err := json.Unmarshal(event, &p); err != nil {
 		return h.handleFallback(ctx, event, err)
 	}
-
+	select {
+	case <-ctx.Done():
+		slog.DebugContext(ctx, "context done", "error", ctx.Err())
+		return nil, ctx.Err()
+	default:
+	}
 	switch {
 	case p.IsSQSEvent:
 		return h.handleSQSEvent(ctx, p.SQSEvent)
@@ -209,10 +211,81 @@ func (h *lambdaHandler) handleSQSEvent(ctx context.Context, sqsEvent *events.SQS
 	return resp, nil
 }
 
+type httpStramingResponseWriter struct {
+	header          http.Header
+	pipeWriter      *io.PipeWriter
+	buffer          bytes.Buffer
+	isWrittenHeader bool
+	ready           chan struct{}
+	resp            events.LambdaFunctionURLStreamingResponse
+}
+
+func newHTTPStramingResponseWriter() *httpStramingResponseWriter {
+	pipeReader, pipeWriter := io.Pipe()
+	resp := events.LambdaFunctionURLStreamingResponse{
+		Body: pipeReader,
+	}
+	return &httpStramingResponseWriter{
+		header:     http.Header{},
+		pipeWriter: pipeWriter,
+		resp:       resp,
+		ready:      make(chan struct{}),
+	}
+}
+
+func (w *httpStramingResponseWriter) Header() http.Header {
+	return w.header
+}
+
+func (w *httpStramingResponseWriter) WriteHeader(code int) {
+	if w.isWrittenHeader {
+		return
+	}
+	w.isWrittenHeader = true
+	w.resp.StatusCode = code
+	if len(w.header) > 0 {
+		w.resp.Headers = make(map[string]string, len(w.header))
+		for k, v := range w.header {
+			if k == "Set-Cookie" {
+				w.resp.Cookies = v
+			} else {
+				w.resp.Headers[k] = strings.Join(v, ",")
+			}
+		}
+	}
+	close(w.ready)
+}
+
+func (w *httpStramingResponseWriter) Write(b []byte) (int, error) {
+	return w.buffer.Write(b)
+}
+
+func (w *httpStramingResponseWriter) Flush() {
+	w.pipeWriter.Write(w.buffer.Bytes())
+	w.buffer.Reset()
+}
+
+func (w *httpStramingResponseWriter) Response() *events.LambdaFunctionURLStreamingResponse {
+	return &w.resp
+}
+
 func (h *lambdaHandler) handleHTTPEvent(ctx context.Context, req *http.Request) (interface{}, error) {
 	r := req.WithContext(ctx)
-	w := ridge.NewResponseWriter()
-	h.serverHandler.ServeHTTP(w, r)
+	if !h.runOptions.invokeModeStramingResponse {
+		w := ridge.NewResponseWriter()
+		h.serverHandler.ServeHTTP(w, r)
+		return w.Response(), nil
+	}
+	w := newHTTPStramingResponseWriter()
+	go func() {
+		defer func() {
+			w.WriteHeader(http.StatusOK)
+			w.Flush()
+			w.pipeWriter.Close()
+		}()
+		h.serverHandler.ServeHTTP(w, r)
+	}()
+	<-w.ready
 	return w.Response(), nil
 }
 
