@@ -776,6 +776,7 @@ func defaultWorkerSender(serializer Serializer, c *runOptions) WorkerSender {
 			}
 			return DelayedSQSMessageID, nil
 		}
+		c.logger.DebugContext(ctx, "send sqs message", "queue_url", queueURL, "delay_seconds", input.DelaySeconds)
 		output, err := client.SendMessage(ctx, input)
 		if err != nil {
 			return "", fmt.Errorf("failed to send sqs message: %w", err)
