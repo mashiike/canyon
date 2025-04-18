@@ -74,7 +74,7 @@ type runOptions struct {
 	workerTimeoutMergin                time.Duration
 	lambdaOptions                      []lambda.Option
 	lambdaMiddlewares                  []func(lambda.Handler) lambda.Handler
-	invokeModeStramingResponse         bool
+	invokeModeStreamingResponse         bool
 }
 
 func defaultRunConfig(cancel context.CancelCauseFunc, sqsQueueName string) *runOptions {
