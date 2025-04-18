@@ -180,8 +180,27 @@ func (s *AlwaysDeserializeErrorSerializer) Deserialize(ctx context.Context, mess
 	return nil, errors.New("always deserialize error")
 }
 
+type mutexWriter struct {
+	mu  sync.Mutex
+	buf strings.Builder
+}
+
+func (w *mutexWriter) Write(p []byte) (n int, err error) {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	return w.buf.Write(p)
+}
+
+func (w *mutexWriter) String() string {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	return w.buf.String()
+}
+
 func TestE2E__DeserializeErrorWithRetryAfter(t *testing.T) {
-	var logBuf strings.Builder
+	logBuf := mutexWriter{
+		buf: strings.Builder{},
+	}
 	defer func() {
 		t.Log(logBuf.String())
 	}()
