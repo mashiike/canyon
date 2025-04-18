@@ -334,7 +334,7 @@ func parseURL(urlStr string) (*url.URL, error) {
 	return u, nil
 }
 
-func isLambda() bool {
+func OnLambdaRuntime() bool {
 	return strings.HasPrefix(os.Getenv("AWS_EXECUTION_ENV"), "AWS_Lambda") || os.Getenv("AWS_LAMBDA_RUNTIME_API") != ""
 }
 

@@ -15,7 +15,11 @@ linters:
       exclude-functions:
         - "fmt.Fprintln"
         - "fmt.Fprintf"
+        - "fmt.Fprint"
         - "io.WriteString"
+        - "io.Copy"
+        - "(io.Closer).Close"
+        - "os.Setenv"
         - "(io.ReadCloser).Close"
         - "(*bytes.Buffer).Write"
         - "(*bytes.Buffer).WriteString"
@@ -23,7 +27,11 @@ linters:
         - "(net/http.ResponseWriter).Write"
         - "(*os.File).Close"
         - "github.com/mashiike/canyon.RunWithContext"
+        - (*github.com/mashiike/canyon/canyontest.Runner).Close
         - "(*encoding/json.Encoder).Encode"
+        - "(net.Listener).Close"
+        - "(*net/http.Server).Shutdown"
+        - "(*io.PipeWriter).Write"
     revive:
       max-open-files: 2048
       rules:

@@ -27,15 +27,19 @@ var (
 // if called by sqs message, component is "worker".
 // if called original http request, component is "server".
 func Logger(r *http.Request) *slog.Logger {
-	ctx := r.Context()
+	logger, _ := loggerFromContext(r.Context())
+	return logger
+}
+
+func loggerFromContext(ctx context.Context) (*slog.Logger, bool) {
 	if ctx == nil {
-		return slog.Default()
+		return slog.Default(), false
 	}
 	logger, ok := ctx.Value(contextKeyLogger).(*slog.Logger)
 	if !ok {
-		return slog.Default()
+		return slog.Default(), false
 	}
-	return logger
+	return logger, true
 }
 
 func embedLoggerInContext(ctx context.Context, logger *slog.Logger) context.Context {
