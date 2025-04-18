@@ -261,7 +261,7 @@ func (w *httpStramingResponseWriter) Write(b []byte) (int, error) {
 }
 
 func (w *httpStramingResponseWriter) Flush() {
-	w.pipeWriter.Write(w.buffer.Bytes()) //lint:ignore errcheck
+	w.pipeWriter.Write(w.buffer.Bytes())
 	w.buffer.Reset()
 }
 
