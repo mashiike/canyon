@@ -74,7 +74,7 @@ type runOptions struct {
 	workerTimeoutMergin                time.Duration
 	lambdaOptions                      []lambda.Option
 	lambdaMiddlewares                  []func(lambda.Handler) lambda.Handler
-	invokeModeStreamingResponse         bool
+	invokeModeStreamingResponse        bool
 }
 
 func defaultRunConfig(cancel context.CancelCauseFunc, sqsQueueName string) *runOptions {
@@ -581,6 +581,6 @@ func WithLambdaMiddlewares(middlewares ...func(lambda.Handler) lambda.Handler) O
 // if set this option, canyon lambda handler use this options.
 func WithStreamingResponse() Option {
 	return func(c *runOptions) {
-		c.invokeModeStramingResponse = true
+		c.invokeModeStreamingResponse = true
 	}
 }
