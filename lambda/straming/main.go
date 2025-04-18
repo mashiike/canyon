@@ -6,7 +6,6 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
-	"math/rand"
 	"net/http"
 	"os"
 	"os/signal"
@@ -15,8 +14,6 @@ import (
 
 	"github.com/mashiike/canyon"
 )
-
-var randReader = rand.New(rand.NewSource(time.Now().UnixNano()))
 
 func main() {
 	slog.SetDefault(slog.New(slog.NewJSONHandler(os.Stderr, &slog.HandlerOptions{Level: slog.LevelDebug})))
@@ -56,7 +53,7 @@ func handler(w http.ResponseWriter, r *http.Request) {
 	// write data every 1 second
 	for i := 0; i < 10; i++ {
 		time.Sleep(1 * time.Second)
-		w.Write([]byte(fmt.Sprintf("data: %d\n\n", i)))
+		fmt.Fprintf(w, "data: %d\n\n", i)
 		flusher.Flush()
 	}
 	// write final data

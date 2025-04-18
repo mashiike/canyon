@@ -261,7 +261,7 @@ func (w *httpStramingResponseWriter) Write(b []byte) (int, error) {
 }
 
 func (w *httpStramingResponseWriter) Flush() {
-	w.pipeWriter.Write(w.buffer.Bytes())
+	w.pipeWriter.Write(w.buffer.Bytes()) //lint:ignore errcheck
 	w.buffer.Reset()
 }
 
@@ -271,7 +271,7 @@ func (w *httpStramingResponseWriter) Response() *events.LambdaFunctionURLStreami
 
 func (h *lambdaHandler) handleHTTPEvent(ctx context.Context, req *http.Request) (interface{}, error) {
 	r := req.WithContext(ctx)
-	if !h.runOptions.invokeModeStramingResponse {
+	if !h.runOptions.invokeModeStreamingResponse {
 		w := ridge.NewResponseWriter()
 		h.serverHandler.ServeHTTP(w, r)
 		return w.Response(), nil
@@ -281,7 +281,9 @@ func (h *lambdaHandler) handleHTTPEvent(ctx context.Context, req *http.Request) 
 		defer func() {
 			w.WriteHeader(http.StatusOK)
 			w.Flush()
-			w.pipeWriter.Close()
+			if err := w.pipeWriter.Close(); err != nil {
+				h.runOptions.WarnContextWhenVarbose(ctx, "failed to close pipe writer", "error", err)
+			}
 		}()
 		h.serverHandler.ServeHTTP(w, r)
 	}()
@@ -339,7 +341,11 @@ func setupHTTPServer(ctx context.Context, serverHandler http.Handler, c *runOpti
 		c.logger.InfoContext(ctx, "shutting down local httpd", "address", c.address)
 		shutdownCtx, timout := context.WithTimeout(context.Background(), 5*time.Second)
 		defer timout()
-		srv.Shutdown(shutdownCtx)
+		if err := srv.Shutdown(shutdownCtx); err != nil {
+			if !errors.Is(err, http.ErrServerClosed) && !errors.Is(err, context.Canceled) && !errors.Is(err, context.DeadlineExceeded) {
+				c.WarnContextWhenVarbose(ctx, "failed to shutdown local httpd", "error", err)
+			}
+		}
 	}()
 	if err := srv.Serve(listener); err != nil {
 		if !errors.Is(err, http.ErrServerClosed) && !errors.Is(err, context.Canceled) && !errors.Is(err, context.DeadlineExceeded) {
@@ -428,7 +434,9 @@ func setupFallbackLambdaHandler(ctx context.Context, lambdaFallbackHandler lambd
 				errors.As(err, &jsonUnmarshalTypeError),
 				errors.As(err, &jsonSyntaxError):
 				c.WarnContextWhenVarbose(ctx, "failed to decode event from stdin, reset decoder state", "error", err)
-				decoder.SkipUntilValidToken()
+				if err := decoder.SkipUntilValidToken(); err != nil {
+					c.WarnContextWhenVarbose(ctx, "failed to skip until valid token", "error", err)
+				}
 				continue
 			default:
 				c.DebugContextWhenVarbose(ctx, "stop fallback lambda handler", "error", err, "type", fmt.Sprintf("%T", err))
@@ -515,7 +523,7 @@ func newWorkerHandler(mux http.Handler, c *runOptions) sqsEventLambdaHandlerFunc
 
 func initializeSQSClient(c *runOptions, _ *slog.Logger) (time.Duration, SQSClient) {
 	var once sync.Once
-	var visibilityTimeout time.Duration = -1 * time.Second
+	var visibilityTimeout = -1 * time.Second
 	var sqsClient SQSClient
 
 	once.Do(func() {
