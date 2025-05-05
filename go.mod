@@ -1,6 +1,7 @@
 module github.com/mashiike/canyon
 
 go 1.23.0
+toolchain go1.24.1
 
 require (
 	github.com/Songmu/flextime v0.1.0
@@ -19,7 +20,7 @@ require (
 	github.com/fujiwara/ridge v0.12.1
 	github.com/google/uuid v1.6.0
 	github.com/gorilla/websocket v1.5.3
-	github.com/pires/go-proxyproto v0.8.0
+	github.com/pires/go-proxyproto v0.8.1
 	github.com/stretchr/testify v1.10.0
 	golang.org/x/text v0.24.0
 )
