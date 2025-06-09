@@ -21,7 +21,7 @@ require (
 	github.com/gorilla/websocket v1.5.3
 	github.com/pires/go-proxyproto v0.8.0
 	github.com/stretchr/testify v1.10.0
-	golang.org/x/text v0.24.0
+	golang.org/x/text v0.26.0
 )
 
 require (
