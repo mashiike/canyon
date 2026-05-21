@@ -1,6 +1,6 @@
 module github.com/mashiike/canyon
 
-go 1.23.0
+go 1.25.0
 
 require (
 	github.com/Songmu/flextime v0.1.0
@@ -16,12 +16,12 @@ require (
 	github.com/aws/aws-sdk-go-v2/service/sqs v1.38.7
 	github.com/aws/aws-sdk-go-v2/service/sts v1.33.21
 	github.com/aws/smithy-go v1.22.3
-	github.com/fujiwara/ridge v0.12.1
+	github.com/fujiwara/ridge v0.13.1
 	github.com/google/uuid v1.6.0
 	github.com/gorilla/websocket v1.5.3
-	github.com/pires/go-proxyproto v0.8.0
+	github.com/pires/go-proxyproto v0.12.0
 	github.com/stretchr/testify v1.10.0
-	golang.org/x/text v0.24.0
+	golang.org/x/text v0.37.0
 )
 
 require (
