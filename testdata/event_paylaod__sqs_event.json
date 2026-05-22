@@ -24,6 +24,9 @@
     ],
     "X-Forwarded-Proto": [
       "https"
+    ],
+    "X-Lambda-Payload-Version": [
+      "2.0"
     ]
   },
   "body": "Zm9vPWJhciUyMGJheg==",

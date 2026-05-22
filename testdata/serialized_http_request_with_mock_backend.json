@@ -28,6 +28,9 @@
     ],
     "X-Forwarded-Proto": [
       "https"
+    ],
+    "X-Lambda-Payload-Version": [
+      "2.0"
     ]
   },
   "content_length": 13,
