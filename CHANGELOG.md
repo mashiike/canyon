@@ -1,5 +1,16 @@
 # Changelog
 
+## [v0.11.1](https://github.com/mashiike/canyon/compare/v0.11.0...v0.11.1) - 2026-05-22
+- Bump the aws-sdk-go-v2 group across 1 directory with 10 updates by @dependabot[bot] in https://github.com/mashiike/canyon/pull/204
+- Bump reviewdog/action-misspell from 1.26.3 to 1.27.0 by @dependabot[bot] in https://github.com/mashiike/canyon/pull/218
+- Bump actions/setup-go from 5.4.0 to 6.0.0 by @dependabot[bot] in https://github.com/mashiike/canyon/pull/213
+- Bump Songmu/tagpr from 1.5.1 to 1.9.0 by @dependabot[bot] in https://github.com/mashiike/canyon/pull/214
+- Bump reviewdog/action-actionlint from 1.65.2 to 1.72.0 by @dependabot[bot] in https://github.com/mashiike/canyon/pull/215
+- Bump actions/checkout from 4.2.2 to 6.0.2 by @dependabot[bot] in https://github.com/mashiike/canyon/pull/207
+- Bump github.com/aws/aws-lambda-go from 1.48.0 to 1.54.0 by @dependabot[bot] in https://github.com/mashiike/canyon/pull/217
+- chore: bump Go to 1.25 and update dependencies by @mashiike in https://github.com/mashiike/canyon/pull/223
+- Bump github.com/aws/aws-sdk-go-v2/service/lambda from 1.71.4 to 1.88.5 by @dependabot[bot] in https://github.com/mashiike/canyon/pull/222
+
 ## [v0.11.0](https://github.com/mashiike/canyon/compare/v0.10.0...v0.11.0) - 2025-04-18
 - Add UsedFromContext and IsWorkerFromContext by @mashiike in https://github.com/mashiike/canyon/pull/180
 - Feature/fix ci by @mashiike in https://github.com/mashiike/canyon/pull/189
