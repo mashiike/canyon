@@ -15,13 +15,13 @@ require (
 	github.com/aws/aws-sdk-go-v2/service/scheduler v1.20.7
 	github.com/aws/aws-sdk-go-v2/service/sqs v1.46.7
 	github.com/aws/aws-sdk-go-v2/service/sts v1.45.7
-	github.com/aws/smithy-go v1.27.8
+	github.com/aws/smithy-go v1.27.9
 	github.com/fujiwara/ridge v0.13.1
 	github.com/google/uuid v1.6.0
 	github.com/gorilla/websocket v1.5.3
-	github.com/pires/go-proxyproto v0.12.0
-	github.com/stretchr/testify v1.12.0
-	golang.org/x/text v0.38.0
+	github.com/pires/go-proxyproto v0.15.0
+	github.com/stretchr/testify v1.12.1
+	golang.org/x/text v0.41.0
 )
 
 require (
@@ -37,5 +37,5 @@ require (
 	github.com/aws/aws-sdk-go-v2/service/signin v1.5.7 // indirect
 	github.com/aws/aws-sdk-go-v2/service/sso v1.33.7 // indirect
 	github.com/aws/aws-sdk-go-v2/service/ssooidc v1.38.7 // indirect
-	gopkg.in/yaml.v3 v3.0.1 // indirect
+	go.yaml.in/yaml/v3 v3.0.5 // indirect
 )
