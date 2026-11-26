@@ -1,5 +1,17 @@
 # Changelog
 
+## [v0.11.2](https://github.com/mashiike/canyon/compare/v0.11.1...v0.11.2) - 2026-11-26
+
+- Bump reviewdog/action-misspell from 1.27.0 to 1.31.0 by @dependabot[bot] in https://github.com/mashiike/canyon/pull/270
+- Bump reviewdog/action-golangci-lint from 2.10.0 to 2.10.2 by @dependabot[bot] in https://github.com/mashiike/canyon/pull/256
+- Bump reviewdog/action-actionlint from 1.73.0 to 1.84.1 by @dependabot[bot] in https://github.com/mashiike/canyon/pull/271
+- Bump Songmu/tagpr from 1.20.1 to 1.22.0 by @dependabot[bot] in https://github.com/mashiike/canyon/pull/269
+- Bump golang.org/x/text from 0.38.0 to 0.41.0 by @dependabot[bot] in https://github.com/mashiike/canyon/pull/244
+- Bump github.com/aws/smithy-go from 1.27.8 to 1.27.9 by @dependabot[bot] in https://github.com/mashiike/canyon/pull/245
+- Bump github.com/pires/go-proxyproto from 0.12.0 to 0.15.0 by @dependabot[bot] in https://github.com/mashiike/canyon/pull/246
+- Bump github.com/stretchr/testify from 1.12.0 to 1.12.1 by @dependabot[bot] in https://github.com/mashiike/canyon/pull/243
+- Bump the aws-sdk-go-v2 group with 10 updates by @dependabot[bot] in https://github.com/mashiike/canyon/pull/242
+
 ## [v0.11.1](https://github.com/mashiike/canyon/compare/v0.11.0...v0.11.1) - 2026-08-20
 
 - Bump the aws-sdk-go-v2 group across 1 directory with 10 updates by @dependabot[bot] in https://github.com/mashiike/canyon/pull/204
